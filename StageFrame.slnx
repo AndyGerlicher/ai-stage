@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AgentSessions/AgentSessions.csproj" />
+    <Project Path="src/Frame/Frame.csproj" />
+    <Project Path="src/Stage/Stage.csproj" />
+  </Folder>
+</Solution>

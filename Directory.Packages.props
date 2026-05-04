@@ -1,0 +1,8 @@
+<Project>
+
+  <ItemGroup>
+    <PackageVersion Include="System.Management" Version="10.0.7" />
+    <PackageVersion Include="Velopack" Version="0.0.1298" />
+  </ItemGroup>
+
+</Project>

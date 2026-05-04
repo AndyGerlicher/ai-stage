@@ -1,0 +1,22 @@
+# Editor
+*.swp
+*.swo
+*~
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# .NET build artifacts
+[Bb]in/
+[Oo]bj/
+
+# Publish output
+publish/
+
+# Velopack release artifacts
+Releases/
+*.nupkg
+
+# Claude Code local state
+.claude/
