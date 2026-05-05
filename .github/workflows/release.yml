@@ -1,22 +1,17 @@
 name: release
 
 # Triggers:
-#   - push to main          → rolling release at version 0.1.${{ github.run_number }}
-#   - push of a v* tag      → release at the tag's version
-#   - manual workflow_dispatch with explicit version
+#   - push to main          → public release; version derived from Nerdbank.GitVersioning (NBGV).
+#   - push of a v* tag      → public release at that tag's NBGV-derived version.
+#   - manual workflow_dispatch (from main)
 #
-# Every push to main becomes a published GitHub Release that installed
-# ai-stage instances pick up automatically (Velopack background update).
+# Versions come from version.json + git height via NBGV — no run_number,
+# no manual version inputs. Bump the major/minor by editing version.json.
 on:
   push:
     branches: [main]
     tags: ['v*']
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version (e.g. 0.1.0). Required for manual runs.'
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -30,32 +25,23 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # NBGV needs full git history to compute version height.
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
 
+      - name: Install nbgv
+        run: dotnet tool install -g nbgv
+
       - name: Resolve version
         id: ver
         shell: pwsh
         run: |
-          $event = '${{ github.event_name }}'
-          $refType = '${{ github.ref_type }}'
-          if ($event -eq 'workflow_dispatch')
-          {
-              $v = '${{ inputs.version }}'
-          }
-          elseif ($refType -eq 'tag')
-          {
-              $v = '${{ github.ref_name }}' -replace '^v', ''
-          }
-          else
-          {
-              # Push to main → rolling per-commit version. github.run_number is
-              # monotonically increasing across runs of this workflow.
-              $v = '0.1.${{ github.run_number }}'
-          }
+          $v = (& nbgv get-version -v NuGetPackageVersion).Trim()
           if ([string]::IsNullOrWhiteSpace($v)) { throw 'Could not resolve version' }
           "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "Release version: $v"

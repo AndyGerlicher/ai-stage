@@ -1,6 +1,7 @@
 <Project>
 
   <ItemGroup>
+    <PackageVersion Include="Nerdbank.GitVersioning" Version="3.9.50" />
     <PackageVersion Include="System.Management" Version="10.0.7" />
     <PackageVersion Include="Velopack" Version="0.0.1298" />
   </ItemGroup>
