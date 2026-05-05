@@ -35,6 +35,14 @@ public partial class MainWindow : Window
     /// <summary>Display name for the agent tab. Defaults to "Copilot" when unresolved.</summary>
     public string AgentDisplayName { get; private set; } = "Copilot";
 
+    /// <summary>
+    /// Prefix stripped from the branch name when building the window title.
+    /// Set by Stage via <c>--branch-prefix</c> to keep title cosmetics in sync
+    /// with Stage's configured prefix; defaults to <c>"dev/angerlic/"</c> for
+    /// standalone Frame launches.
+    /// </summary>
+    public string BranchPrefix { get; set; } = "dev/angerlic/";
+
     public MainWindow()
     {
         InitializeComponent();
@@ -249,10 +257,9 @@ public partial class MainWindow : Window
         if (string.IsNullOrEmpty(branch))
             return repoName;
 
-        // Strip dev/angerlic/ prefix for a cleaner title
-        const string branchPrefix = "dev/angerlic/";
-        string displayBranch = branch.StartsWith(branchPrefix, StringComparison.Ordinal)
-            ? branch[branchPrefix.Length..]
+        // Strip the configured branch prefix for a cleaner title.
+        string displayBranch = branch.StartsWith(BranchPrefix, StringComparison.Ordinal)
+            ? branch[BranchPrefix.Length..]
             : branch;
 
         return $"{repoName} — {displayBranch}";

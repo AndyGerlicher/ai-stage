@@ -19,12 +19,14 @@ public partial class App : Application
         string? agentId = null;
         string? agentCommandOverride = null;
         string? agentTitleOverride = null;
+        string? branchPrefix = null;
 
         // Parse CLI args: first non-flag value is the folder.
         // --initial-prompt-file <path>     optional seed prompt
         // --agent <id>                     pick a registered agent provider (default: github-copilot)
         // --agent-command "<cmd>"          escape hatch: run a raw command, no provider lookup
         // --agent-title "<title>"          tab title override (used with --agent-command)
+        // --branch-prefix <value>          override the branch prefix stripped from the window title
         for (int i = 0; i < e.Args.Length; i++)
         {
             string arg = e.Args[i];
@@ -50,6 +52,12 @@ public partial class App : Application
                 && i + 1 < e.Args.Length)
             {
                 agentTitleOverride = e.Args[++i];
+                continue;
+            }
+            if (string.Equals(arg, "--branch-prefix", StringComparison.OrdinalIgnoreCase)
+                && i + 1 < e.Args.Length)
+            {
+                branchPrefix = e.Args[++i];
                 continue;
             }
 
@@ -118,6 +126,9 @@ public partial class App : Application
             AgentCommandOverride = agentCommandOverride,
             AgentTitleOverride = agentTitleOverride,
         };
+        // Empty string is intentional ("no prefix"); only skip when the flag was absent.
+        if (branchPrefix is not null)
+            window.BranchPrefix = branchPrefix;
         MainWindow = window;
         ShutdownMode = ShutdownMode.OnMainWindowClose;
         window.Show();

@@ -22,6 +22,12 @@ public partial class MainWindow : Window
     /// </summary>
     public string? DefaultAgentProvider { get; set; }
 
+    /// <summary>
+    /// Prefix applied to new worktree branch names (e.g. <c>"dev/angerlic/"</c>).
+    /// Loaded from <see cref="StageConfig.BranchPrefix"/>; always ends with <c>/</c>.
+    /// </summary>
+    public string BranchPrefix { get; set; } = StageConfig.DefaultBranchPrefix;
+
     private readonly ObservableCollection<RepoNode> _repos = new();
     private readonly RepoFilter _filter = new();
     private IAgentSessionStore? _agentStore;
@@ -67,7 +73,7 @@ public partial class MainWindow : Window
         IReadOnlyList<RepoNode> found;
         try
         {
-            found = await RepoScanner.ScanAsync(RootPath);
+            found = await RepoScanner.ScanAsync(RootPath, BranchPrefix);
         }
         catch (Exception ex)
         {
@@ -133,7 +139,7 @@ public partial class MainWindow : Window
         if (session is not null && AgentSessionLauncher.TryFocus(session))
             return;
         string? agentId = session?.ProviderId ?? DefaultAgentProvider;
-        FrameLauncher.Launch(path, agentId: agentId);
+        FrameLauncher.Launch(path, agentId: agentId, branchPrefix: BranchPrefix);
     }
 
     private async void OnNewWorktreeClick(object sender, RoutedEventArgs e)
@@ -145,7 +151,7 @@ public partial class MainWindow : Window
         string worktreeRoot = Path.Combine(Path.GetDirectoryName(repo.Path)!, $"{repoName}.wt");
         int slot = WorktreeService.NextSlot(worktreeRoot);
 
-        var dlg = new WorktreeDialog(repo.Name, slot) { Owner = this };
+        var dlg = new WorktreeDialog(repo.Name, slot, BranchPrefix) { Owner = this };
         if (dlg.ShowDialog() != true)
             return;
 
@@ -155,7 +161,7 @@ public partial class MainWindow : Window
         ShowBusy($"Creating worktree (slot {slot})...");
         try
         {
-            result = await WorktreeService.CreateAsync(repo.Path, branchSuffix);
+            result = await WorktreeService.CreateAsync(repo.Path, BranchPrefix, branchSuffix);
         }
         finally
         {
@@ -180,9 +186,10 @@ public partial class MainWindow : Window
             Branch = GitMetadata.ReadBranch(Path.Combine(repo.Path, ".git", "worktrees", slotName, "HEAD")),
             LastActivityUtc = DateTime.UtcNow,
             ParentRepoPath = repo.Path,
+            BranchPrefix = BranchPrefix,
         });
 
-        FrameLauncher.Launch(result.Path);
+        FrameLauncher.Launch(result.Path, branchPrefix: BranchPrefix);
     }
 
     private async void OnResetWorktreeClick(object sender, RoutedEventArgs e)
@@ -207,7 +214,7 @@ public partial class MainWindow : Window
 
         int slot = int.TryParse(wt.Name, out int n) ? n : 0;
 
-        var dlg = new WorktreeDialog(parent.Name, slot, wt.DisplayName) { Owner = this };
+        var dlg = new WorktreeDialog(parent.Name, slot, BranchPrefix, wt.DisplayName) { Owner = this };
         if (dlg.ShowDialog() != true)
             return;
 
@@ -217,7 +224,7 @@ public partial class MainWindow : Window
         ShowBusy("Resetting worktree to origin/main...");
         try
         {
-            result = await WorktreeService.ResetAsync(wt.ParentRepoPath, wt.Path, branchSuffix);
+            result = await WorktreeService.ResetAsync(wt.ParentRepoPath, wt.Path, BranchPrefix, branchSuffix);
         }
         finally
         {
@@ -242,9 +249,10 @@ public partial class MainWindow : Window
             {
                 Name = wt.Name,
                 Path = wt.Path,
-                Branch = $"dev/angerlic/{branchSuffix}",
+                Branch = BranchPrefix + branchSuffix,
                 LastActivityUtc = DateTime.UtcNow,
                 ParentRepoPath = wt.ParentRepoPath,
+                BranchPrefix = BranchPrefix,
             };
         }
     }
