@@ -9,7 +9,7 @@ namespace Stage.Services;
 /// </summary>
 internal static class RepoScanner
 {
-    public static async Task<IReadOnlyList<RepoNode>> ScanAsync(string rootPath, CancellationToken ct = default)
+    public static async Task<IReadOnlyList<RepoNode>> ScanAsync(string rootPath, string branchPrefix, CancellationToken ct = default)
     {
         if (!Directory.Exists(rootPath))
             return [];
@@ -58,6 +58,7 @@ internal static class RepoScanner
                         Branch = wt.branch,
                         LastActivityUtc = wt.lastActivity,
                         ParentRepoPath = dir,
+                        BranchPrefix = branchPrefix,
                     });
                 }
 

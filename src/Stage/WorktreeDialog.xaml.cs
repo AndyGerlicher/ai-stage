@@ -11,14 +11,16 @@ public partial class WorktreeDialog : Window
     private readonly string _repoName;
     private readonly int _slot;
     private readonly bool _isReset;
+    private readonly string _branchPrefix;
 
     /// <summary>Create mode — auto-numbered slot, user picks branch name.</summary>
-    public WorktreeDialog(string repoName, int slot)
+    public WorktreeDialog(string repoName, int slot, string branchPrefix)
     {
         InitializeComponent();
         _repoName = repoName;
         _slot = slot;
         _isReset = false;
+        _branchPrefix = branchPrefix;
         TitleText.Text = $"New worktree — {repoName}";
         CreateButton.Content = "Create";
         NameBox.TextChanged += (_, _) => UpdateHint();
@@ -27,12 +29,13 @@ public partial class WorktreeDialog : Window
     }
 
     /// <summary>Reset mode — existing slot, user picks new branch name.</summary>
-    public WorktreeDialog(string repoName, int slot, string currentBranchSuffix)
+    public WorktreeDialog(string repoName, int slot, string branchPrefix, string currentBranchSuffix)
     {
         InitializeComponent();
         _repoName = repoName;
         _slot = slot;
         _isReset = true;
+        _branchPrefix = branchPrefix;
         TitleText.Text = $"Reset worktree — {repoName} (slot {slot})";
         CreateButton.Content = "Reset";
         NameBox.Text = currentBranchSuffix;
@@ -47,13 +50,13 @@ public partial class WorktreeDialog : Window
         if (string.IsNullOrEmpty(name))
         {
             PathHintText.Text = _isReset
-                ? "Branch: dev/angerlic/<name>  —  resets to origin/main"
-                : $"…\\{_repoName}.wt\\{_slot}  →  branch dev/angerlic/<name>";
+                ? $"Branch: {_branchPrefix}<name>  —  resets to origin/main"
+                : $"…\\{_repoName}.wt\\{_slot}  →  branch {_branchPrefix}<name>";
             return;
         }
         PathHintText.Text = _isReset
-            ? $"Branch: dev/angerlic/{name}  —  resets to origin/main"
-            : $"…\\{_repoName}.wt\\{_slot}  →  branch dev/angerlic/{name}";
+            ? $"Branch: {_branchPrefix}{name}  —  resets to origin/main"
+            : $"…\\{_repoName}.wt\\{_slot}  →  branch {_branchPrefix}{name}";
     }
 
     private void OnCreateClick(object sender, RoutedEventArgs e)

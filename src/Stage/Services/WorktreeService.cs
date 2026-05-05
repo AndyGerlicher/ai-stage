@@ -14,7 +14,7 @@ internal static class WorktreeService
     /// <summary>
     /// Creates a new worktree in the next available numbered slot, branching from origin/main.
     /// </summary>
-    public static async Task<WorktreeResult> CreateAsync(string mainRepoPath, string branchSuffix, CancellationToken ct = default)
+    public static async Task<WorktreeResult> CreateAsync(string mainRepoPath, string branchPrefix, string branchSuffix, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(branchSuffix))
             return new WorktreeResult(false, null, "Branch name cannot be empty.");
@@ -41,7 +41,7 @@ internal static class WorktreeService
         // Fetch latest before creating the worktree.
         await RunGitAsync(mainRepoPath, ["fetch"], ct);
 
-        string fullBranch = $"dev/angerlic/{branchSuffix}";
+        string fullBranch = branchPrefix + branchSuffix;
 
         // First attempt: create a new branch starting at origin/main.
         var (ok, stderr) = await RunGitAsync(mainRepoPath, ["worktree", "add", "-b", fullBranch, targetPath, "origin/main"], ct);
@@ -63,14 +63,14 @@ internal static class WorktreeService
     /// <summary>
     /// Resets an existing worktree to origin/main on a new (or existing) branch.
     /// </summary>
-    public static async Task<WorktreeResult> ResetAsync(string mainRepoPath, string worktreePath, string branchSuffix, CancellationToken ct = default)
+    public static async Task<WorktreeResult> ResetAsync(string mainRepoPath, string worktreePath, string branchPrefix, string branchSuffix, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(branchSuffix))
             return new WorktreeResult(false, null, "Branch name cannot be empty.");
 
         await RunGitAsync(mainRepoPath, ["fetch"], ct);
 
-        string fullBranch = $"dev/angerlic/{branchSuffix}";
+        string fullBranch = branchPrefix + branchSuffix;
 
         // Switch to new (or reset existing) branch at origin/main.
         var (ok, stderr) = await RunGitAsync(worktreePath, ["checkout", "-B", fullBranch, "origin/main"], ct);

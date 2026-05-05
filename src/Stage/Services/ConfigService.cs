@@ -5,6 +5,8 @@ namespace Stage.Services;
 
 internal sealed class StageConfig
 {
+    public const string DefaultBranchPrefix = "";
+
     public string RootPath { get; set; } = @"D:\src";
 
     /// <summary>
@@ -15,6 +17,19 @@ internal sealed class StageConfig
     /// from any provider, that session's provider always wins.
     /// </summary>
     public string? DefaultAgentProvider { get; set; }
+
+    /// <summary>
+    /// Prefix applied to all worktree branch names created by Stage
+    /// (e.g. <c>"dev/angerlic/"</c> produces branches like
+    /// <c>dev/angerlic/feature-x</c>).
+    /// <para>
+    /// JSON semantics: <b>missing key, <c>null</c>, or empty string</b> means
+    /// no prefix (branches use the suffix as-is); any other value is
+    /// normalized (leading <c>/</c> stripped, trailing <c>/</c> appended)
+    /// by <see cref="ConfigService.Load"/>.
+    /// </para>
+    /// </summary>
+    public string? BranchPrefix { get; set; }
 }
 
 internal static class ConfigService
@@ -25,18 +40,28 @@ internal static class ConfigService
 
     public static StageConfig Load()
     {
+        StageConfig config;
         try
         {
-            if (!File.Exists(StorePath))
-                return new StageConfig();
-
-            string json = File.ReadAllText(StorePath);
-            return JsonSerializer.Deserialize<StageConfig>(json) ?? new StageConfig();
+            config = File.Exists(StorePath)
+                ? JsonSerializer.Deserialize<StageConfig>(File.ReadAllText(StorePath)) ?? new StageConfig()
+                : new StageConfig();
         }
         catch
         {
-            return new StageConfig();
+            config = new StageConfig();
         }
+
+        config.BranchPrefix = NormalizeBranchPrefix(config.BranchPrefix);
+        return config;
+    }
+
+    private static string NormalizeBranchPrefix(string? value)
+    {
+        string trimmed = (value ?? "").Trim().TrimStart('/');
+        if (trimmed.Length == 0)
+            return "";
+        return trimmed.EndsWith('/') ? trimmed : trimmed + "/";
     }
 
     public static void Save(StageConfig config)

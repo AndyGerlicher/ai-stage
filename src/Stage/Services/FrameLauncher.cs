@@ -72,12 +72,13 @@ internal static class FrameLauncher
     }
 
     /// <summary>
-    /// <summary>
-    /// Launches Frame on a folder, optionally passing an initial-prompt file
-    /// and/or an agent provider id (forwarded as <c>--agent &lt;id&gt;</c>).
+    /// Launches Frame on a folder, optionally passing an initial-prompt file,
+    /// an agent provider id (forwarded as <c>--agent &lt;id&gt;</c>), and/or
+    /// the configured branch prefix (forwarded as <c>--branch-prefix &lt;value&gt;</c>)
+    /// so Frame's title strip stays in sync with Stage's setting.
     /// Shows a MessageBox with install hint if launch fails.
     /// </summary>
-    public static bool Launch(string folder, string? initialPromptFile = null, string? agentId = null)
+    public static bool Launch(string folder, string? initialPromptFile = null, string? agentId = null, string? branchPrefix = null)
     {
         string? frame = ResolveFrame();
 
@@ -86,6 +87,11 @@ internal static class FrameLauncher
             args.Add($"--initial-prompt-file \"{initialPromptFile}\"");
         if (!string.IsNullOrEmpty(agentId))
             args.Add($"--agent \"{agentId}\"");
+        // Pass the flag whenever the caller supplied a value, including the
+        // empty string — that's how Stage tells Frame "use no prefix" and
+        // overrides Frame's standalone default.
+        if (branchPrefix is not null)
+            args.Add($"--branch-prefix \"{branchPrefix}\"");
         string argString = string.Join(' ', args);
 
         ProcessStartInfo startInfo;

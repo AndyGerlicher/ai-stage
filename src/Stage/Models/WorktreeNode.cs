@@ -8,8 +8,6 @@ namespace Stage.Models;
 /// </summary>
 internal sealed class WorktreeNode : ObservableNode
 {
-    private const string BranchPrefix = "dev/angerlic/";
-
     private AgentSessionStatus? _copilotState;
     private int _copilotSessionCount;
 
@@ -19,7 +17,10 @@ internal sealed class WorktreeNode : ObservableNode
     public DateTime? LastActivityUtc { get; init; }
     public required string ParentRepoPath { get; init; }
 
-    /// <summary>Short display name derived from the branch (strips dev/angerlic/ prefix).</summary>
+    /// <summary>Configured branch prefix (e.g. <c>"dev/angerlic/"</c>) used to strip the leading prefix from <see cref="DisplayName"/>.</summary>
+    public required string BranchPrefix { get; init; }
+
+    /// <summary>Short display name derived from the branch (strips the configured <see cref="BranchPrefix"/>).</summary>
     public string DisplayName => Branch.StartsWith(BranchPrefix, StringComparison.Ordinal)
         ? Branch[BranchPrefix.Length..]
         : Branch;

@@ -27,6 +27,10 @@ public partial class App : Application
         {
             RootPath = rootPath,
             DefaultAgentProvider = config.DefaultAgentProvider,
+            // Nullable on the JSON model to distinguish "missing key" (→ default)
+            // from "explicit empty" (→ no prefix); ConfigService.Load guarantees
+            // a non-null normalized value here.
+            BranchPrefix = config.BranchPrefix!,
         };
         MainWindow = window;
         window.Show();
