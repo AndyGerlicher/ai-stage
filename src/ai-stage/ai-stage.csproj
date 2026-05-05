@@ -8,7 +8,22 @@
     <AssemblyName>ai-stage</AssemblyName>
     <RootNamespace>AiStage</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
+    <!--
+      We supply our own Main in Program.cs so VelopackApp.Build().Run()
+      can execute before any WPF types are loaded. Suppress the WPF SDK's
+      auto-generated entry point and point StartupObject at ours.
+    -->
+    <StartupObject>AiStage.Program</StartupObject>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Demote App.xaml from ApplicationDefinition to Page so the SDK
+      doesn't auto-generate a Main that bypasses Program.Main.
+    -->
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml" />
+  </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Resources\app-icon.png" />
