@@ -43,6 +43,8 @@ public partial class MainWindow : Window
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        VersionText.Text = FormatVersion();
+
         RepoTree.ItemsSource = _repos;
 
         var view = CollectionViewSource.GetDefaultView(_repos);
@@ -376,5 +378,25 @@ public partial class MainWindow : Window
         FilterPlaceholder.Visibility = string.IsNullOrEmpty(FilterBox.Text)
             ? Visibility.Visible
             : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// Formats the NBGV-injected version for the title strip:
+    /// "0.2.1 41a864b" (italic in XAML). Falls back to just the version
+    /// when no git hash is present (rare — e.g. ThisAssembly missing).
+    /// </summary>
+    private static string FormatVersion()
+    {
+        // ThisAssembly.AssemblyInformationalVersion is shaped like "0.2.1+41a864b0e7"
+        // (or just "0.2.1" if NBGV omitted the metadata).
+        string informational = ThisAssembly.AssemblyInformationalVersion;
+        int plus = informational.IndexOf('+');
+        if (plus < 0)
+            return informational;
+
+        string version = informational[..plus];
+        string hash = informational[(plus + 1)..];
+        if (hash.Length > 7) hash = hash[..7];
+        return $"{version} {hash}";
     }
 }

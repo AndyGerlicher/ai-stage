@@ -302,9 +302,15 @@
                             Style="{StaticResource CloseButtonStyle}" ToolTip="Close"/>
                 </StackPanel>
 
-                <TextBlock Text="ai-stage" Foreground="#e8e8e8" FontSize="12"
-                           FontFamily="Segoe UI Semibold"
-                           VerticalAlignment="Center" Margin="14,0,0,0"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
+                    <TextBlock Text="ai-stage" Foreground="#e8e8e8" FontSize="12"
+                               FontFamily="Segoe UI Semibold"
+                               VerticalAlignment="Center"/>
+                    <TextBlock x:Name="VersionText" Text="" Foreground="#666"
+                               FontSize="11" FontFamily="Segoe UI"
+                               FontStyle="Italic"
+                               VerticalAlignment="Center" Margin="6,0,0,0"/>
+                </StackPanel>
                 <TextBlock x:Name="RootPathText" Text="" Foreground="#666"
                            VerticalAlignment="Center" HorizontalAlignment="Center"
                            FontSize="11" FontFamily="Segoe UI"
