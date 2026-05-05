@@ -78,6 +78,7 @@
         </Style>
     </Window.Resources>
 
+    <Border BorderBrush="#5a5a5a" BorderThickness="1" CornerRadius="8">
     <Grid Margin="0">
         <Grid.RowDefinitions>
             <RowDefinition Height="32"/>
@@ -129,4 +130,5 @@
             </DockPanel>
         </Border>
     </Grid>
+    </Border>
 </Window>

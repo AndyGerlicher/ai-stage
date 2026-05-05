@@ -257,6 +257,7 @@
         </DataTemplate>
     </Window.Resources>
 
+    <Border BorderBrush="#5a5a5a" BorderThickness="1" CornerRadius="8">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="32"/>
@@ -395,4 +396,5 @@
             </Grid>
         </Grid>
     </Grid>
+    </Border>
 </Window>

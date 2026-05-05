@@ -103,6 +103,7 @@
         </Style>
     </Window.Resources>
 
+    <Border BorderBrush="#5a5a5a" BorderThickness="1" CornerRadius="8">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="32"/>
@@ -157,7 +158,11 @@
             </DockPanel>
         </Border>
 
-        <!-- Terminal Host Panels -->
-        <Grid Grid.Row="1" x:Name="TerminalContainer"/>
+        <!-- Terminal Host Panels.
+             Margin leaves a resize hit-test zone outside the embedded WT
+             child HWND. Without this, clicking near the window edges hits
+             the WT child and WindowChrome's resize behavior never fires. -->
+        <Grid Grid.Row="1" x:Name="TerminalContainer" Margin="6,0,6,6"/>
     </Grid>
+    </Border>
 </Window>

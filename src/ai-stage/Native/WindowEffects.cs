@@ -13,26 +13,30 @@ namespace AiStage.Native;
 internal static partial class WindowEffects
 {
     // DWMWINDOWATTRIBUTE values — see <dwmapi.h>.
-    // DWMWA_USE_IMMERSIVE_DARK_MODE switches the system-drawn resize border /
-    // shadow over to the dark variant; DWMWA_BORDER_COLOR (Win11 22000+)
-    // paints a 1-pixel border in the requested color.
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
-    private const int DWMWA_BORDER_COLOR = 34;
+    private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+
+    // DWM_WINDOW_CORNER_PREFERENCE values.
+    private const int DWMWCP_ROUND = 2;
 
     [LibraryImport("dwmapi.dll")]
     private static partial int DwmSetWindowAttribute(
         IntPtr hwnd, int attribute, ref int pvAttribute, int cbAttribute);
 
     /// <summary>
-    /// Enables a thin DWM border on the given window. Safe to call on
-    /// older Windows versions: DwmSetWindowAttribute simply returns a
-    /// non-zero HRESULT for unsupported attributes and we ignore it.
+    /// Enables a thin, dark-themed system frame on the given window.
     ///
-    /// <paramref name="colorBgr"/> is a Win32 COLORREF (0x00BBGGRR). The
-    /// default 0x00444444 is a neutral gray that reads the same in BGR
-    /// and RGB and stays subtle against both light and dark backgrounds.
+    /// Sets DWMWA_USE_IMMERSIVE_DARK_MODE so the system-drawn resize edge,
+    /// drop shadow, and caption fall back to the dark variant. DWMWA_BORDER_COLOR
+    /// is intentionally not used — when the window has GlassFrameThickness=0
+    /// (as our windows do), DWM has no non-client area to paint into, so that
+    /// attribute is ineffective. The visible 1-pixel border itself is rendered
+    /// in WPF via a &lt;Border&gt; wrapper inside each window.
+    ///
+    /// Safe to call on older Windows versions: DwmSetWindowAttribute simply
+    /// returns a non-zero HRESULT for unsupported attributes and we ignore it.
     /// </summary>
-    public static void EnableThinBorder(Window window, uint colorBgr = 0x00444444)
+    public static void EnableThinBorder(Window window)
     {
         if (window is null) return;
 
@@ -48,8 +52,9 @@ internal static partial class WindowEffects
                 int dark = 1;
                 DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
 
-                int border = unchecked((int)colorBgr);
-                DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, ref border, sizeof(int));
+                // Standard Windows 11 rounded corners (~8px). No-ops on Windows 10.
+                int round = DWMWCP_ROUND;
+                DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref round, sizeof(int));
             }
             catch
             {
