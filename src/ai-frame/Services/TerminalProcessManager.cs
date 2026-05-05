@@ -14,7 +14,7 @@ internal sealed class TerminalProcessManager : IDisposable
     private Process? _process;
     private nint _hwnd;
     private bool _disposed;
-    private string? _tempCmdFile;
+    private string? _tempScriptFile;
 
     public string TitleMarker { get; }
     public string WindowName { get; }
@@ -28,18 +28,19 @@ internal sealed class TerminalProcessManager : IDisposable
     }
 
     /// <summary>
-    /// Launches wt.exe with a temp .cmd wrapper to avoid shell quoting issues.
-    /// Uses a unique named window and title marker for HWND discovery.
+    /// Launches wt.exe hosting the requested shell. For cmd-based shells we
+    /// write a temp .cmd wrapper to avoid quoting hell; for PowerShell we
+    /// pass the init command via -Command. Uses a unique named window and
+    /// title marker so we can discover the HWND for embedding.
     /// </summary>
-    public async Task<nint> LaunchAsync(string workingDirectory, string? vsDevCmdPath, string? extraCommand)
+    public async Task<nint> LaunchAsync(string workingDirectory, string? vsDevCmdPath, TerminalLaunchSpec spec)
     {
-        // Create temp .cmd file — eliminates all quoting/escaping problems
-        _tempCmdFile = CreateTempCmdFile(vsDevCmdPath, extraCommand);
+        string shellArgs = BuildShellInvocation(spec, vsDevCmdPath);
 
         // Use a unique named window to guarantee a separate WT window.
-        // --suppressApplicationTitle prevents VsDevCmd/clink from changing the title
-        // before we can discover the HWND.
-        string args = $"-w {WindowName} --title \"{TitleMarker}\" --suppressApplicationTitle -d \"{workingDirectory}\" -- cmd.exe /k \"{_tempCmdFile}\"";
+        // --suppressApplicationTitle prevents the inner shell from changing the
+        // title before we can discover the HWND.
+        string args = $"-w {WindowName} --title \"{TitleMarker}\" --suppressApplicationTitle -d \"{workingDirectory}\" -- {shellArgs}";
 
         var startInfo = new ProcessStartInfo
         {
@@ -62,6 +63,43 @@ internal sealed class TerminalProcessManager : IDisposable
         return _hwnd;
     }
 
+    /// <summary>
+    /// Builds the trailing wt.exe argument that launches the actual shell.
+    /// Returns a space-separated invocation suitable to follow the wt.exe
+    /// "-- " separator.
+    /// </summary>
+    private string BuildShellInvocation(TerminalLaunchSpec spec, string? vsDevCmdPath)
+    {
+        switch (spec.Shell)
+        {
+            case ConsoleShell.PowerShell:
+            {
+                // -NoExit keeps the prompt open after the init command runs.
+                if (string.IsNullOrWhiteSpace(spec.InitCommand))
+                    return "powershell.exe -NoExit";
+
+                // PowerShell single-quote escape: '' inside a '...' literal.
+                string escaped = spec.InitCommand.Replace("'", "''");
+                return $"powershell.exe -NoExit -Command \"& {{ {escaped} }}\"";
+            }
+
+            case ConsoleShell.Cmd:
+            {
+                if (string.IsNullOrWhiteSpace(spec.InitCommand))
+                    return "cmd.exe /k";
+                _tempScriptFile = WriteCmdWrapper(vsDevCmdPath: null, spec.InitCommand);
+                return $"cmd.exe /k \"{_tempScriptFile}\"";
+            }
+
+            case ConsoleShell.VsDevCmd:
+            default:
+            {
+                _tempScriptFile = WriteCmdWrapper(vsDevCmdPath, spec.InitCommand);
+                return $"cmd.exe /k \"{_tempScriptFile}\"";
+            }
+        }
+    }
+
     private async Task<nint> DiscoverHwndAsync(TimeSpan timeout)
     {
         var sw = Stopwatch.StartNew();
@@ -80,7 +118,7 @@ internal sealed class TerminalProcessManager : IDisposable
         return nint.Zero;
     }
 
-    private string CreateTempCmdFile(string? vsDevCmdPath, string? extraCommand)
+    private static string WriteCmdWrapper(string? vsDevCmdPath, string? extraCommand)
     {
         string tempDir = Path.Combine(Path.GetTempPath(), "ai-frame");
         Directory.CreateDirectory(tempDir);
@@ -88,9 +126,9 @@ internal sealed class TerminalProcessManager : IDisposable
 
         var sb = new StringBuilder();
         sb.AppendLine("@echo off");
-        if (vsDevCmdPath is not null)
+        if (!string.IsNullOrEmpty(vsDevCmdPath))
             sb.AppendLine($"call \"{vsDevCmdPath}\" -startdir=none -arch=x64 -host_arch=x64");
-        if (extraCommand is not null)
+        if (!string.IsNullOrEmpty(extraCommand))
             sb.AppendLine(extraCommand);
         File.WriteAllText(tempFile, sb.ToString());
         return tempFile;
@@ -116,9 +154,9 @@ internal sealed class TerminalProcessManager : IDisposable
         _process?.Dispose();
 
         // Clean up temp file
-        if (_tempCmdFile is not null)
+        if (_tempScriptFile is not null)
         {
-            try { File.Delete(_tempCmdFile); } catch { }
+            try { File.Delete(_tempScriptFile); } catch { }
         }
     }
 }

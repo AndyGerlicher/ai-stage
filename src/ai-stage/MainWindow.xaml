@@ -294,6 +294,9 @@
                     <Button Content="&#xE8DA;" Click="OnPickRootClick"
                             Style="{StaticResource CaptionButtonStyle}" ToolTip="Change root folder"
                             FontSize="14"/>
+                    <Button Content="&#xE713;" Click="OnSettingsClick"
+                            Style="{StaticResource CaptionButtonStyle}" ToolTip="Settings"
+                            FontSize="14"/>
                     <Border Width="1" Background="#383838" Margin="0,6"/>
                     <Button Content="&#xE921;" Click="OnMinimizeClick"
                             Style="{StaticResource CaptionButtonStyle}" ToolTip="Minimize"/>

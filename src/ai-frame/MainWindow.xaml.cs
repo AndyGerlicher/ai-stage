@@ -32,6 +32,16 @@ public partial class MainWindow : Window
     /// <summary>Optional tab title override; falls back to the resolved provider's DisplayName.</summary>
     public string? AgentTitleOverride { get; set; }
 
+    /// <summary>Extra arguments to forward to the agent CLI. Set by ai-stage via
+    /// <c>--agent-args</c>; null = let the provider use its built-in default.</summary>
+    public string? AgentArgs { get; set; }
+
+    /// <summary>Console tab shell; default <see cref="Services.ConsoleShell.VsDevCmd"/>.</summary>
+    public Services.ConsoleShell ConsoleShell { get; set; } = Services.ConsoleShell.VsDevCmd;
+
+    /// <summary>Optional command line to execute in the Console tab after shell init.</summary>
+    public string? ConsoleInitCommand { get; set; }
+
     /// <summary>Display name for the agent tab. Defaults to "Copilot" when unresolved.</summary>
     public string AgentDisplayName { get; private set; } = "Copilot";
 
@@ -79,7 +89,7 @@ public partial class MainWindow : Window
                         $"Registered: {string.Join(", ", AgentRegistry.Providers.Select(p => p.Id))}");
             }
             AgentDisplayName = AgentTitleOverride ?? provider.DisplayName;
-            command = provider.GetLaunchCommand(InitialPromptFile);
+            command = provider.GetLaunchCommand(InitialPromptFile, AgentArgs);
         }
         CopilotTabButton.Content = "★ " + AgentDisplayName;
 
@@ -98,11 +108,14 @@ public partial class MainWindow : Window
 
         string? vsDevCmdPath = VsDevCmd.ResolvePath();
 
+        var agentSpec = TerminalLaunchSpec.ForAgent(command);
+        var consoleSpec = new TerminalLaunchSpec(ConsoleShell, ConsoleInitCommand);
+
         try
         {
             // Launch Agent first (primary tab), then Console — sequential to avoid WT merging
-            await _copilotHost.AttachTerminalAsync(WorkingDirectory, vsDevCmdPath, command);
-            await _consoleHost.AttachTerminalAsync(WorkingDirectory, vsDevCmdPath, null);
+            await _copilotHost.AttachTerminalAsync(WorkingDirectory, vsDevCmdPath, agentSpec);
+            await _consoleHost.AttachTerminalAsync(WorkingDirectory, vsDevCmdPath, consoleSpec);
 
             StatusText.Text = "";
             _copilotHost.FocusTerminal();

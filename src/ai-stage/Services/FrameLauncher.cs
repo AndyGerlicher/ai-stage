@@ -73,12 +73,19 @@ internal static class FrameLauncher
 
     /// <summary>
     /// Launches ai-frame on a folder, optionally passing an initial-prompt file,
-    /// an agent provider id (forwarded as <c>--agent &lt;id&gt;</c>), and/or
-    /// the configured branch prefix (forwarded as <c>--branch-prefix &lt;value&gt;</c>)
-    /// so ai-frame's title strip stays in sync with ai-stage's setting.
-    /// Shows a MessageBox with install hint if launch fails.
+    /// an agent provider id (forwarded as <c>--agent &lt;id&gt;</c>),
+    /// the configured branch prefix (forwarded as <c>--branch-prefix &lt;value&gt;</c>),
+    /// and ai-stage's per-tab customization (Console shell + init command,
+    /// agent extra args). Shows a MessageBox with install hint if launch fails.
     /// </summary>
-    public static bool Launch(string folder, string? initialPromptFile = null, string? agentId = null, string? branchPrefix = null)
+    public static bool Launch(
+        string folder,
+        string? initialPromptFile = null,
+        string? agentId = null,
+        string? branchPrefix = null,
+        string? consoleShell = null,
+        string? consoleInit = null,
+        string? agentArgs = null)
     {
         string? frame = ResolveFrame();
 
@@ -92,6 +99,14 @@ internal static class FrameLauncher
         // overrides ai-frame's standalone default.
         if (branchPrefix is not null)
             args.Add($"--branch-prefix \"{branchPrefix}\"");
+        if (!string.IsNullOrEmpty(consoleShell))
+            args.Add($"--console-shell \"{consoleShell}\"");
+        if (!string.IsNullOrEmpty(consoleInit))
+            args.Add($"--console-init \"{EscapeQuotes(consoleInit)}\"");
+        // Empty string is meaningful: "explicitly no extra args" overrides
+        // the provider's built-in default.
+        if (agentArgs is not null)
+            args.Add($"--agent-args \"{EscapeQuotes(agentArgs)}\"");
         string argString = string.Join(' ', args);
 
         ProcessStartInfo startInfo;
@@ -133,4 +148,10 @@ internal static class FrameLauncher
             return false;
         }
     }
+
+    /// <summary>
+    /// Backslash-escape any embedded double quotes for safe round-trip through
+    /// CommandLineToArgvW (which is what .NET uses to parse process args).
+    /// </summary>
+    private static string EscapeQuotes(string value) => value.Replace("\"", "\\\"");
 }
