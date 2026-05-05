@@ -10,6 +10,7 @@ public partial class PromptDialog : Window
     public PromptDialog(string targetName)
     {
         InitializeComponent();
+        AiStage.Native.WindowEffects.EnableThinBorder(this);
         TitleText.Text = $"Open with initial prompt — {targetName}";
         Loaded += (_, _) => PromptBox.Focus();
     }
