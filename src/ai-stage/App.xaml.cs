@@ -11,6 +11,9 @@ public partial class App : Application
     {
         VelopackApp.Build().Run();
 
+        // Fire-and-forget background update check. Applies on next exit.
+        _ = UpdateService.CheckAsync();
+
         ShutdownMode = ShutdownMode.OnMainWindowClose;
 
         var config = ConfigService.Load();

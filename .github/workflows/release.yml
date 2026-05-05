@@ -1,7 +1,15 @@
 name: release
 
+# Triggers:
+#   - push to main          → rolling release at version 0.1.${{ github.run_number }}
+#   - push of a v* tag      → release at the tag's version
+#   - manual workflow_dispatch with explicit version
+#
+# Every push to main becomes a published GitHub Release that installed
+# ai-stage instances pick up automatically (Velopack background update).
 on:
   push:
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
     inputs:
@@ -12,6 +20,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -28,13 +40,21 @@ jobs:
         id: ver
         shell: pwsh
         run: |
-          if ('${{ github.event_name }}' -eq 'workflow_dispatch')
+          $event = '${{ github.event_name }}'
+          $refType = '${{ github.ref_type }}'
+          if ($event -eq 'workflow_dispatch')
           {
               $v = '${{ inputs.version }}'
           }
-          else
+          elseif ($refType -eq 'tag')
           {
               $v = '${{ github.ref_name }}' -replace '^v', ''
+          }
+          else
+          {
+              # Push to main → rolling per-commit version. github.run_number is
+              # monotonically increasing across runs of this workflow.
+              $v = '0.1.${{ github.run_number }}'
           }
           if ([string]::IsNullOrWhiteSpace($v)) { throw 'Could not resolve version' }
           "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
