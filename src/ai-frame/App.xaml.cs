@@ -19,14 +19,20 @@ public partial class App : Application
         string? agentId = null;
         string? agentCommandOverride = null;
         string? agentTitleOverride = null;
+        string? agentArgs = null;
         string? branchPrefix = null;
+        string? consoleShellRaw = null;
+        string? consoleInit = null;
 
         // Parse CLI args: first non-flag value is the folder.
         // --initial-prompt-file <path>     optional seed prompt
         // --agent <id>                     pick a registered agent provider (default: github-copilot)
         // --agent-command "<cmd>"          escape hatch: run a raw command, no provider lookup
         // --agent-title "<title>"          tab title override (used with --agent-command)
+        // --agent-args "<args>"            extra arguments forwarded to the agent CLI (e.g. --allow-all-tools)
         // --branch-prefix <value>          override the branch prefix stripped from the window title
+        // --console-shell <kind>           Console tab shell: VsDevCmd | PowerShell | Cmd
+        // --console-init "<line>"          command to run in the Console tab after shell init
         for (int i = 0; i < e.Args.Length; i++)
         {
             string arg = e.Args[i];
@@ -54,10 +60,28 @@ public partial class App : Application
                 agentTitleOverride = e.Args[++i];
                 continue;
             }
+            if (string.Equals(arg, "--agent-args", StringComparison.OrdinalIgnoreCase)
+                && i + 1 < e.Args.Length)
+            {
+                agentArgs = e.Args[++i];
+                continue;
+            }
             if (string.Equals(arg, "--branch-prefix", StringComparison.OrdinalIgnoreCase)
                 && i + 1 < e.Args.Length)
             {
                 branchPrefix = e.Args[++i];
+                continue;
+            }
+            if (string.Equals(arg, "--console-shell", StringComparison.OrdinalIgnoreCase)
+                && i + 1 < e.Args.Length)
+            {
+                consoleShellRaw = e.Args[++i];
+                continue;
+            }
+            if (string.Equals(arg, "--console-init", StringComparison.OrdinalIgnoreCase)
+                && i + 1 < e.Args.Length)
+            {
+                consoleInit = e.Args[++i];
                 continue;
             }
 
@@ -125,7 +149,14 @@ public partial class App : Application
             AgentId = agentId,
             AgentCommandOverride = agentCommandOverride,
             AgentTitleOverride = agentTitleOverride,
+            AgentArgs = agentArgs,
+            ConsoleInitCommand = consoleInit,
         };
+        if (consoleShellRaw is not null
+            && Enum.TryParse<AiFrame.Services.ConsoleShell>(consoleShellRaw, ignoreCase: true, out var parsedShell))
+        {
+            window.ConsoleShell = parsedShell;
+        }
         // Empty string is intentional ("no prefix"); only skip when the flag was absent.
         if (branchPrefix is not null)
             window.BranchPrefix = branchPrefix;

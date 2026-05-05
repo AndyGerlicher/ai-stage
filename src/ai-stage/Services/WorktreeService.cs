@@ -61,24 +61,42 @@ internal static class WorktreeService
     }
 
     /// <summary>
-    /// Resets an existing worktree to origin/main on a new (or existing) branch.
+    /// Resets an existing worktree by running the user-supplied
+    /// <paramref name="resetCommands"/> (one command per line, executed via
+    /// <c>cmd.exe /c</c> in the worktree's working directory). The token
+    /// <c>&lt;new-branch&gt;</c> is replaced with the full branch name
+    /// (<paramref name="branchPrefix"/> + <paramref name="branchSuffix"/>).
+    /// Aborts on the first non-zero exit and returns the failing line's stderr.
     /// </summary>
-    public static async Task<WorktreeResult> ResetAsync(string mainRepoPath, string worktreePath, string branchPrefix, string branchSuffix, CancellationToken ct = default)
+    public static async Task<WorktreeResult> ResetAsync(
+        string mainRepoPath,
+        string worktreePath,
+        string branchPrefix,
+        string branchSuffix,
+        string resetCommands,
+        CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(branchSuffix))
             return new WorktreeResult(false, null, "Branch name cannot be empty.");
-
-        await RunGitAsync(mainRepoPath, ["fetch"], ct);
+        if (string.IsNullOrWhiteSpace(resetCommands))
+            return new WorktreeResult(false, null, "Reset commands are empty (configure them in Settings).");
 
         string fullBranch = branchPrefix + branchSuffix;
 
-        // Switch to new (or reset existing) branch at origin/main.
-        var (ok, stderr) = await RunGitAsync(worktreePath, ["checkout", "-B", fullBranch, "origin/main"], ct);
-        if (!ok)
-            return new WorktreeResult(false, null, $"Branch switch failed: {stderr}");
+        // Run each non-empty / non-comment line through cmd.exe /c in the
+        // worktree dir. Lines starting with '#' are ignored so users can
+        // annotate their command list.
+        string[] lines = resetCommands.Replace("\r\n", "\n").Split('\n');
+        foreach (string raw in lines)
+        {
+            string line = raw.Trim();
+            if (line.Length == 0 || line.StartsWith('#')) continue;
 
-        // Clean untracked files and directories.
-        await RunGitAsync(worktreePath, ["clean", "-fdx"], ct);
+            string command = line.Replace("<new-branch>", fullBranch, StringComparison.Ordinal);
+            var (ok, stderr) = await RunShellAsync(worktreePath, command, ct);
+            if (!ok)
+                return new WorktreeResult(false, null, $"`{command}` failed:\n{stderr}");
+        }
 
         return new WorktreeResult(true, worktreePath, null);
     }
@@ -188,6 +206,53 @@ internal static class WorktreeService
             string stderr = await proc.StandardError.ReadToEndAsync(ct);
             await proc.WaitForExitAsync(ct);
             return (proc.ExitCode == 0, stderr.Trim());
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Runs a single user-supplied command line through <c>cmd.exe /c</c> in
+    /// <paramref name="workingDir"/>. Returns success + stderr like
+    /// <see cref="RunGitAsync"/> so callers can chain with the same shape.
+    /// Going through cmd.exe lets the user use shell features like <c>&amp;&amp;</c>,
+    /// pipes, and redirection in their reset commands.
+    /// </summary>
+    private static async Task<(bool ok, string stderr)> RunShellAsync(string workingDir, string commandLine, CancellationToken ct)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            WorkingDirectory = workingDir,
+            // /d disables AutoRun keys, /s preserves the quoted command for /c.
+            Arguments = $"/d /s /c \"{commandLine}\"",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        try
+        {
+            using var proc = Process.Start(psi);
+            if (proc is null)
+                return (false, "Failed to start cmd.exe.");
+
+            // Drain both streams concurrently; large outputs (e.g. a noisy
+            // git fetch) can otherwise deadlock when only stderr is read.
+            var stdoutTask = proc.StandardOutput.ReadToEndAsync(ct);
+            var stderrTask = proc.StandardError.ReadToEndAsync(ct);
+            await proc.WaitForExitAsync(ct);
+            string stdout = await stdoutTask;
+            string stderr = await stderrTask;
+
+            if (proc.ExitCode == 0) return (true, "");
+            // Many git commands write the meaningful error to stdout; surface
+            // whichever stream has content.
+            string err = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
+            return (false, err.Trim());
         }
         catch (Exception ex)
         {

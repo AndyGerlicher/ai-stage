@@ -1,0 +1,363 @@
+<Window x:Class="AiStage.SettingsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="ai-stage — Settings"
+        Width="640" Height="640"
+        MinWidth="520" MinHeight="500"
+        Background="#1e1e1e"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        WindowStyle="None"
+        AllowsTransparency="False"
+        KeyDown="OnKeyDown">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome
+            CaptionHeight="32"
+            GlassFrameThickness="0"
+            CornerRadius="0"
+            ResizeBorderThickness="6"
+            UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <Style x:Key="DialogCloseButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#999"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#e81123"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="#2a2a2a"/>
+            <Setter Property="Foreground" Value="#e8e8e8"/>
+            <Setter Property="BorderBrush" Value="#444"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="CaretBrush" Value="#e8e8e8"/>
+            <Setter Property="SelectionBrush" Value="#0078d4"/>
+        </Style>
+
+        <Style x:Key="MonoTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource DarkTextBoxStyle}">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+
+        <Style x:Key="BrowseButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#333"/>
+            <Setter Property="Foreground" Value="#ccc"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#3d3d3d"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#e8e8e8"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#0078d4"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#2a2a2a"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Custom ComboBox template so the dropdown Popup is dark too. The
+             default WPF template uses a system-themed (light) Popup background
+             which made our #e8e8e8 item text unreadable. -->
+        <Style x:Key="DarkComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Background" Value="#2a2a2a"/>
+            <Setter Property="Foreground" Value="#e8e8e8"/>
+            <Setter Property="BorderBrush" Value="#444"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItemStyle}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="22"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Closed-state surface + chevron -->
+                            <ToggleButton x:Name="ToggleBtn" Grid.ColumnSpan="2"
+                                          Focusable="False" ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay,
+                                                              RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Bd"
+                                                Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="22"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="Glyph" Grid.Column="1"
+                                                           Text="&#xE70D;"
+                                                           FontFamily="Segoe MDL2 Assets" FontSize="9"
+                                                           Foreground="#888"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="BorderBrush" Value="#555"/>
+                                                <Setter TargetName="Glyph" Property="Foreground" Value="#ccc"/>
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Bd" Property="BorderBrush" Value="#0078d4"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                                <ToggleButton.Background>
+                                    <Binding Path="Background" RelativeSource="{RelativeSource TemplatedParent}"/>
+                                </ToggleButton.Background>
+                                <ToggleButton.BorderBrush>
+                                    <Binding Path="BorderBrush" RelativeSource="{RelativeSource TemplatedParent}"/>
+                                </ToggleButton.BorderBrush>
+                                <ToggleButton.BorderThickness>
+                                    <Binding Path="BorderThickness" RelativeSource="{RelativeSource TemplatedParent}"/>
+                                </ToggleButton.BorderThickness>
+                            </ToggleButton>
+
+                            <ContentPresenter x:Name="ContentSite" Grid.Column="0"
+                                              Margin="{TemplateBinding Padding}"
+                                              IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+
+                            <!-- Dark dropdown popup -->
+                            <Popup x:Name="PART_Popup"
+                                   AllowsTransparency="True"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   PopupAnimation="Slide"
+                                   Focusable="False">
+                                <Border Background="#1e1e1e"
+                                        BorderBrush="#444"
+                                        BorderThickness="1"
+                                        MinWidth="{TemplateBinding ActualWidth}"
+                                        MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <ScrollViewer>
+                                        <ItemsPresenter/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#888"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontFamily" Value="Segoe UI Semibold"/>
+            <Setter Property="Margin" Value="0,18,0,8"/>
+        </Style>
+
+        <Style x:Key="LabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#aaa"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+        </Style>
+
+        <Style x:Key="HintStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#666"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="Margin" Value="0,2,0,4"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+    </Window.Resources>
+
+    <Border BorderBrush="#5a5a5a" BorderThickness="1" CornerRadius="8">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="32"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title bar -->
+        <Border Grid.Row="0" Background="#252525">
+            <DockPanel>
+                <Button Content="&#xE8BB;" DockPanel.Dock="Right" Click="OnCancelClick"
+                        Style="{StaticResource DialogCloseButtonStyle}"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                <TextBlock x:Name="TitleText" Text="Settings" Foreground="#888"
+                           FontSize="12" FontFamily="Segoe UI"
+                           VerticalAlignment="Center" Margin="14,0,0,0"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Body -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="20,4,20,16">
+
+                <!-- ───────── General ───────── -->
+                <TextBlock Text="GENERAL" Style="{StaticResource SectionHeaderStyle}" Margin="0,12,0,8"/>
+
+                <TextBlock Text="Starting folder" Style="{StaticResource LabelStyle}"/>
+                <TextBlock Text="The root that ai-stage scans for git repositories."
+                           Style="{StaticResource HintStyle}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="RootPathBox" Grid.Column="0"
+                             Style="{StaticResource DarkTextBoxStyle}"/>
+                    <Button Grid.Column="1" Content="Browse…" Click="OnBrowseClick"
+                            Style="{StaticResource BrowseButtonStyle}" Margin="6,0,0,0"/>
+                </Grid>
+
+                <TextBlock Text="Branch prefix" Style="{StaticResource LabelStyle}" Margin="0,16,0,0"/>
+                <TextBlock Text="Prepended to branch names when creating worktrees (e.g. dev/alice/). Leave blank for no prefix."
+                           Style="{StaticResource HintStyle}"/>
+                <TextBox x:Name="BranchPrefixBox" Style="{StaticResource DarkTextBoxStyle}"/>
+
+                <!-- ───────── Worktree reset ───────── -->
+                <TextBlock Text="WORKTREE RESET" Style="{StaticResource SectionHeaderStyle}"/>
+                <TextBlock Text="Commands to run when resetting a worktree, one per line. The token &lt;new-branch&gt; is replaced with the full branch name. Lines starting with # are ignored."
+                           Style="{StaticResource HintStyle}"/>
+                <TextBox x:Name="ResetCommandsBox" Style="{StaticResource MonoTextBoxStyle}"
+                         Height="100" AcceptsReturn="True" TextWrapping="NoWrap"
+                         VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Auto"/>
+
+                <!-- ───────── Console tab ───────── -->
+                <TextBlock Text="CONSOLE TAB" Style="{StaticResource SectionHeaderStyle}"/>
+
+                <TextBlock Text="Shell" Style="{StaticResource LabelStyle}"/>
+                <TextBlock Text="Which shell ai-frame's Console tab launches."
+                           Style="{StaticResource HintStyle}"/>
+                <ComboBox x:Name="ConsoleShellCombo" Style="{StaticResource DarkComboBoxStyle}"
+                          DisplayMemberPath="Label" SelectedValuePath="Value"/>
+
+                <TextBlock Text="Init command (optional)" Style="{StaticResource LabelStyle}" Margin="0,12,0,0"/>
+                <TextBlock Text="Runs in the Console tab after the shell finishes its own startup."
+                           Style="{StaticResource HintStyle}"/>
+                <TextBox x:Name="ConsoleInitBox" Style="{StaticResource MonoTextBoxStyle}"/>
+
+                <!-- ───────── Agent ───────── -->
+                <TextBlock Text="AGENT" Style="{StaticResource SectionHeaderStyle}"/>
+
+                <TextBlock Text="Default agent" Style="{StaticResource LabelStyle}"/>
+                <TextBlock Text="Which AI agent ai-frame launches by default. Existing live sessions keep their own agent."
+                           Style="{StaticResource HintStyle}"/>
+                <ComboBox x:Name="AgentCombo" Style="{StaticResource DarkComboBoxStyle}"
+                          DisplayMemberPath="DisplayName" SelectedValuePath="Id"/>
+
+                <TextBlock Text="CLI flags" Style="{StaticResource LabelStyle}" Margin="0,12,0,0"/>
+                <TextBlock Text="Per-agent extra arguments. Leave a row blank to pass nothing; clear and re-fill to reset to the agent's default."
+                           Style="{StaticResource HintStyle}"/>
+                <ItemsControl x:Name="AgentArgsList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding DisplayName}"
+                                           Foreground="#cfcfcf" FontSize="12" FontFamily="Segoe UI"
+                                           VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1"
+                                         Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MonoTextBoxStyle}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Background="#252525" Padding="20,10">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="Cancel" Click="OnCancelClick"
+                            Background="#333" Foreground="#ccc" BorderThickness="0"
+                            Padding="16,6" FontSize="12" FontFamily="Segoe UI"
+                            Cursor="Hand" Margin="0,0,8,0"/>
+                    <Button x:Name="SaveButton" Content="Save" Click="OnSaveClick" IsDefault="True"
+                            Background="#0078d4" Foreground="White" BorderThickness="0"
+                            Padding="16,6" FontSize="12" FontFamily="Segoe UI Semibold"
+                            Cursor="Hand"/>
+                </StackPanel>
+                <TextBlock Text="Esc to cancel" Foreground="#555"
+                           FontSize="11" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+    </Border>
+</Window>

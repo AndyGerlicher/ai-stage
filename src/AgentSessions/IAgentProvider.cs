@@ -14,13 +14,27 @@ public interface IAgentProvider
     string DisplayName { get; }
 
     /// <summary>
+    /// The provider's recommended default flags appended to its CLI invocation
+    /// when the host doesn't override (e.g. <c>"--allow-all-tools"</c> for
+    /// GitHub Copilot, <c>"--dangerously-skip-permissions"</c> for Claude).
+    /// Used by the settings UI to pre-fill defaults and by
+    /// <see cref="GetLaunchCommand"/> when <c>extraArgs</c> is null.
+    /// </summary>
+    string DefaultExtraArgs { get; }
+
+    /// <summary>
     /// Returns the full shell command line ai-frame should run inside its
     /// terminal to start the agent CLI in interactive mode. Providers own
     /// their own quoting and are responsible for handling the optional
     /// <paramref name="initialPromptFile"/> (typically a UTF-8 text file the
     /// host wants the agent to consume on startup).
+    ///
+    /// <para><paramref name="extraArgs"/> is an optional, host-supplied
+    /// argument string the provider should append to its CLI invocation.
+    /// When null, providers fall back to <see cref="DefaultExtraArgs"/>;
+    /// an explicit empty string means "no extra args".</para>
     /// </summary>
-    string GetLaunchCommand(string? initialPromptFile);
+    string GetLaunchCommand(string? initialPromptFile, string? extraArgs = null);
 
     /// <summary>
     /// Creates a new session store for this provider. The caller owns the

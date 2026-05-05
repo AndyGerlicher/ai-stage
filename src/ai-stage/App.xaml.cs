@@ -14,6 +14,19 @@ public partial class App : Application
 
         ShutdownMode = ShutdownMode.OnMainWindowClose;
 
+        // First run: no persisted config yet → walk the user through the
+        // settings dialog before opening MainWindow. If they cancel we let
+        // them in with sensible defaults but don't persist, so they get the
+        // prompt again next launch (until they Save once).
+        bool isFirstRun = !ConfigService.Exists();
+        if (isFirstRun)
+        {
+            var seed = new StageConfig();
+            var dlg = new SettingsDialog(seed);
+            if (dlg.ShowDialog() == true && dlg.Result is not null)
+                ConfigService.Save(dlg.Result);
+        }
+
         var config = ConfigService.Load();
         string rootPath = config.RootPath;
 
@@ -32,6 +45,10 @@ public partial class App : Application
             // from "explicit empty" (→ no prefix); ConfigService.Load guarantees
             // a non-null normalized value here.
             BranchPrefix = config.BranchPrefix!,
+            WorktreeResetCommands = config.WorktreeResetCommands ?? StageConfig.DefaultWorktreeResetCommands,
+            ConsoleShell = config.ConsoleShell,
+            ConsoleInitCommand = config.ConsoleInitCommand,
+            AgentArgs = config.AgentArgs ?? new System.Collections.Generic.Dictionary<string, string>(),
         };
         MainWindow = window;
         window.Show();

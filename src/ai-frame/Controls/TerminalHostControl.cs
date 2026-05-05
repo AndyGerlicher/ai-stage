@@ -42,14 +42,14 @@ internal sealed class TerminalHostControl : HwndHost
     /// Launch the terminal process and embed it once the host HWND is ready.
     /// Call this after the control is loaded and BuildWindowCore has run.
     /// </summary>
-    public async Task AttachTerminalAsync(string workingDirectory, string? vsDevCmdPath, string? extraCommand)
+    public async Task AttachTerminalAsync(string workingDirectory, string? vsDevCmdPath, TerminalLaunchSpec spec)
     {
         if (_hostHwnd == nint.Zero)
             throw new InvalidOperationException("Host HWND not yet created. Wait for control to load.");
 
         try
         {
-            nint wtHwnd = await _processManager.LaunchAsync(workingDirectory, vsDevCmdPath, extraCommand);
+            nint wtHwnd = await _processManager.LaunchAsync(workingDirectory, vsDevCmdPath, spec);
 
             // Strip WT chrome styles and force Windows to recalculate the frame
             Win32.StripChromeAndMakeChild(wtHwnd);

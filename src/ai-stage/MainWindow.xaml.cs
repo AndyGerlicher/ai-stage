@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
@@ -28,6 +29,22 @@ public partial class MainWindow : Window
     /// (no prefix) or a non-empty value ending with <c>/</c>.
     /// </summary>
     public string BranchPrefix { get; set; } = StageConfig.DefaultBranchPrefix;
+
+    /// <summary>
+    /// Commands run by the "Reset worktree" action, one per line. Loaded from
+    /// <see cref="StageConfig.WorktreeResetCommands"/>; ConfigService.Load
+    /// substitutes the default if the user hasn't customized it.
+    /// </summary>
+    public string WorktreeResetCommands { get; set; } = StageConfig.DefaultWorktreeResetCommands;
+
+    /// <summary>Console-tab shell choice forwarded to ai-frame (null = ai-frame default).</summary>
+    public string? ConsoleShell { get; set; }
+
+    /// <summary>Optional console-tab init command line forwarded to ai-frame.</summary>
+    public string? ConsoleInitCommand { get; set; }
+
+    /// <summary>Per-provider CLI argument overrides; missing key = use provider default.</summary>
+    public Dictionary<string, string> AgentArgs { get; set; } = new();
 
     private readonly ObservableCollection<RepoNode> _repos = new();
     private readonly RepoFilter _filter = new();
@@ -142,8 +159,26 @@ public partial class MainWindow : Window
         var session = _agentBinder?.FindSessionForPath(path);
         if (session is not null && AgentSessionLauncher.TryFocus(session))
             return;
+        // Resolve which agent we're handing off (and therefore whose extra
+        // args to forward). Priority: live-session provider > Stage default
+        // > null (let ai-frame pick its own default).
         string? agentId = session?.ProviderId ?? DefaultAgentProvider;
-        FrameLauncher.Launch(path, agentId: agentId, branchPrefix: BranchPrefix);
+
+        // Look up the matching extra-args override, if any. AgentArgs uses
+        // missing-key = "use provider default", explicit empty string =
+        // "no extra args"; FrameLauncher.Launch preserves both via the
+        // null vs. "" distinction on its agentArgs parameter.
+        string? agentArgs = null;
+        if (agentId is not null && AgentArgs.TryGetValue(agentId, out var configured))
+            agentArgs = configured;
+
+        FrameLauncher.Launch(
+            path,
+            agentId: agentId,
+            branchPrefix: BranchPrefix,
+            consoleShell: ConsoleShell,
+            consoleInit: ConsoleInitCommand,
+            agentArgs: agentArgs);
     }
 
     private async void OnNewWorktreeClick(object sender, RoutedEventArgs e)
@@ -193,7 +228,20 @@ public partial class MainWindow : Window
             BranchPrefix = BranchPrefix,
         });
 
-        FrameLauncher.Launch(result.Path, branchPrefix: BranchPrefix);
+        // For brand-new worktrees no live session can exist yet, so the agent
+        // is determined entirely by the configured default. Look up its
+        // matching extra-args override the same way OpenPath does.
+        string? newAgentArgs = null;
+        if (DefaultAgentProvider is not null && AgentArgs.TryGetValue(DefaultAgentProvider, out var configured))
+            newAgentArgs = configured;
+
+        FrameLauncher.Launch(
+            result.Path,
+            agentId: DefaultAgentProvider,
+            branchPrefix: BranchPrefix,
+            consoleShell: ConsoleShell,
+            consoleInit: ConsoleInitCommand,
+            agentArgs: newAgentArgs);
     }
 
     private async void OnResetWorktreeClick(object sender, RoutedEventArgs e)
@@ -228,7 +276,7 @@ public partial class MainWindow : Window
         ShowBusy("Resetting worktree to origin/main...");
         try
         {
-            result = await WorktreeService.ResetAsync(wt.ParentRepoPath, wt.Path, BranchPrefix, branchSuffix);
+            result = await WorktreeService.ResetAsync(wt.ParentRepoPath, wt.Path, BranchPrefix, branchSuffix, WorktreeResetCommands);
         }
         finally
         {
@@ -349,6 +397,43 @@ public partial class MainWindow : Window
         ConfigService.Save(config);
 
         await RefreshAsync();
+    }
+
+    private async void OnSettingsClick(object sender, RoutedEventArgs e)
+    {
+        var current = ConfigService.Load();
+        // Patch the in-memory copy to reflect what MainWindow is actually using
+        // for fields the user might have changed via the title-bar shortcut
+        // (Change root folder) since startup.
+        current.RootPath = RootPath;
+        current.BranchPrefix = BranchPrefix;
+        current.DefaultAgentProvider = DefaultAgentProvider;
+        current.WorktreeResetCommands = WorktreeResetCommands;
+        current.ConsoleShell = ConsoleShell;
+        current.ConsoleInitCommand = ConsoleInitCommand;
+        current.AgentArgs = AgentArgs;
+
+        var dlg = new SettingsDialog(current) { Owner = this };
+        if (dlg.ShowDialog() != true || dlg.Result is null) return;
+
+        var saved = dlg.Result;
+        ConfigService.Save(saved);
+
+        // Reload via ConfigService so BranchPrefix is normalized the same
+        // way startup applies it.
+        var reloaded = ConfigService.Load();
+        bool rootChanged = !string.Equals(RootPath, reloaded.RootPath, StringComparison.OrdinalIgnoreCase);
+
+        RootPath = reloaded.RootPath;
+        BranchPrefix = reloaded.BranchPrefix!;
+        DefaultAgentProvider = reloaded.DefaultAgentProvider;
+        WorktreeResetCommands = reloaded.WorktreeResetCommands ?? StageConfig.DefaultWorktreeResetCommands;
+        ConsoleShell = reloaded.ConsoleShell;
+        ConsoleInitCommand = reloaded.ConsoleInitCommand;
+        AgentArgs = reloaded.AgentArgs ?? new Dictionary<string, string>();
+
+        if (rootChanged)
+            await RefreshAsync();
     }
 
     private async void OnKeyDown(object sender, KeyEventArgs e)
