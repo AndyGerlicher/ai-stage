@@ -1,7 +1,6 @@
 using System.IO;
 using System.Windows;
 using AiStage.Services;
-using Velopack;
 
 namespace AiStage;
 
@@ -9,8 +8,7 @@ public partial class App : Application
 {
     private void OnStartup(object sender, StartupEventArgs e)
     {
-        VelopackApp.Build().Run();
-
+        // VelopackApp.Build().Run() runs in Program.Main before this point.
         // Fire-and-forget background update check. Applies on next exit.
         _ = UpdateService.CheckAsync();
 
