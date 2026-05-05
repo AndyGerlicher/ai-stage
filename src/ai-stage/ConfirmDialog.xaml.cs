@@ -8,6 +8,7 @@ public partial class ConfirmDialog : Window
     public ConfirmDialog(string title, string message, string detail, string confirmLabel = "Continue")
     {
         InitializeComponent();
+        AiStage.Native.WindowEffects.EnableThinBorder(this);
         TitleText.Text = title;
         MessageText.Text = message;
         DetailText.Text = string.IsNullOrWhiteSpace(detail) ? "(clean)" : detail;

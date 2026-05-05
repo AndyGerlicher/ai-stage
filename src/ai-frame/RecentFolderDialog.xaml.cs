@@ -14,6 +14,7 @@ public partial class RecentFolderDialog : Window
     public RecentFolderDialog(IEnumerable<string> recentFolders)
     {
         InitializeComponent();
+        AiFrame.Native.WindowEffects.EnableThinBorder(this);
 
         var items = recentFolders
             .Where(Directory.Exists)

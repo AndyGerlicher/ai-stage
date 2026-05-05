@@ -17,6 +17,7 @@ public partial class WorktreeDialog : Window
     public WorktreeDialog(string repoName, int slot, string branchPrefix)
     {
         InitializeComponent();
+        AiStage.Native.WindowEffects.EnableThinBorder(this);
         _repoName = repoName;
         _slot = slot;
         _isReset = false;
@@ -32,6 +33,7 @@ public partial class WorktreeDialog : Window
     public WorktreeDialog(string repoName, int slot, string branchPrefix, string currentBranchSuffix)
     {
         InitializeComponent();
+        AiStage.Native.WindowEffects.EnableThinBorder(this);
         _repoName = repoName;
         _slot = slot;
         _isReset = true;
