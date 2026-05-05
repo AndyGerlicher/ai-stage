@@ -5,7 +5,7 @@ namespace Stage.Services;
 
 internal sealed class StageConfig
 {
-    public const string DefaultBranchPrefix = "dev/angerlic/";
+    public const string DefaultBranchPrefix = "";
 
     public string RootPath { get; set; } = @"D:\src";
 
@@ -23,11 +23,10 @@ internal sealed class StageConfig
     /// (e.g. <c>"dev/angerlic/"</c> produces branches like
     /// <c>dev/angerlic/feature-x</c>).
     /// <para>
-    /// JSON semantics: <b>missing key or <c>null</c></b> falls back to
-    /// <see cref="DefaultBranchPrefix"/>; <b>empty string <c>""</c></b> is
-    /// honored as "no prefix" (branches use the suffix as-is); any other
-    /// value is normalized (leading <c>/</c> stripped, trailing <c>/</c>
-    /// appended) by <see cref="ConfigService.Load"/>.
+    /// JSON semantics: <b>missing key, <c>null</c>, or empty string</b> means
+    /// no prefix (branches use the suffix as-is); any other value is
+    /// normalized (leading <c>/</c> stripped, trailing <c>/</c> appended)
+    /// by <see cref="ConfigService.Load"/>.
     /// </para>
     /// </summary>
     public string? BranchPrefix { get; set; }
@@ -59,14 +58,7 @@ internal static class ConfigService
 
     private static string NormalizeBranchPrefix(string? value)
     {
-        // null = key absent (or explicit JSON null) → fall back to default.
-        // Empty string = explicit "no prefix" → honored as-is.
-        if (value is null)
-            return StageConfig.DefaultBranchPrefix;
-        if (value.Length == 0)
-            return "";
-
-        string trimmed = value.Trim().TrimStart('/');
+        string trimmed = (value ?? "").Trim().TrimStart('/');
         if (trimmed.Length == 0)
             return "";
         return trimmed.EndsWith('/') ? trimmed : trimmed + "/";

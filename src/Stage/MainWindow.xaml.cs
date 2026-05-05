@@ -24,7 +24,8 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Prefix applied to new worktree branch names (e.g. <c>"dev/angerlic/"</c>).
-    /// Loaded from <see cref="StageConfig.BranchPrefix"/>; always ends with <c>/</c>.
+    /// Loaded from <see cref="StageConfig.BranchPrefix"/>; either an empty string
+    /// (no prefix) or a non-empty value ending with <c>/</c>.
     /// </summary>
     public string BranchPrefix { get; set; } = StageConfig.DefaultBranchPrefix;
 

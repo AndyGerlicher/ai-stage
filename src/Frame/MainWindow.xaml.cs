@@ -38,10 +38,10 @@ public partial class MainWindow : Window
     /// <summary>
     /// Prefix stripped from the branch name when building the window title.
     /// Set by Stage via <c>--branch-prefix</c> to keep title cosmetics in sync
-    /// with Stage's configured prefix; defaults to <c>"dev/angerlic/"</c> for
-    /// standalone Frame launches.
+    /// with Stage's configured prefix; defaults to no prefix (full branch name
+    /// shown) for standalone Frame launches.
     /// </summary>
-    public string BranchPrefix { get; set; } = "dev/angerlic/";
+    public string BranchPrefix { get; set; } = "";
 
     public MainWindow()
     {
