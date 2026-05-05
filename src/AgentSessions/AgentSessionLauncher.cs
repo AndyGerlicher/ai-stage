@@ -7,7 +7,7 @@ namespace AgentSessions;
 /// Brings the terminal window hosting an agent CLI process to the foreground.
 ///
 /// The agent CLI runs as a console process inside a terminal host
-/// (Windows Terminal / Frame / conhost). The session's PID points at the
+/// (Windows Terminal / ai-frame / conhost). The session's PID points at the
 /// agent executable, which has no window. We walk the parent chain looking
 /// for the outermost ancestor whose process is a known terminal host and
 /// has a main window — that is the window the user actually sees.
@@ -18,7 +18,7 @@ public static class AgentSessionLauncher
     {
         "WindowsTerminal",
         "wt",
-        "Frame",
+        "ai-frame",
         "conhost",
         "OpenConsole",
     };

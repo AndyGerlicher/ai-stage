@@ -13,7 +13,7 @@ public sealed class ClaudeCodeProvider : IAgentProvider
     public string DisplayName => "Claude Code";
 
     /// <summary>
-    /// Returns the command Frame should run to start the Claude Code CLI.
+    /// Returns the command ai-frame should run to start the Claude Code CLI.
     /// When <paramref name="initialPromptFile"/> is supplied and exists, the
     /// command is wrapped in a PowerShell shim that reads the prompt and
     /// passes it as Claude's positional initial-message argument, deleting

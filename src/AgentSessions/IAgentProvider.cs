@@ -10,11 +10,11 @@ public interface IAgentProvider
     /// <summary>Stable identifier, e.g. <c>"github-copilot"</c>. Used as a CLI flag value.</summary>
     string Id { get; }
 
-    /// <summary>Human-readable name shown in UIs (e.g. used as the Frame tab title).</summary>
+    /// <summary>Human-readable name shown in UIs (e.g. used as the ai-frame tab title).</summary>
     string DisplayName { get; }
 
     /// <summary>
-    /// Returns the full shell command line Frame should run inside its
+    /// Returns the full shell command line ai-frame should run inside its
     /// terminal to start the agent CLI in interactive mode. Providers own
     /// their own quoting and are responsible for handling the optional
     /// <paramref name="initialPromptFile"/> (typically a UTF-8 text file the

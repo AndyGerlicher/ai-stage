@@ -22,10 +22,10 @@ jobs:
           global-json-file: global.json
 
       - name: Restore
-        run: dotnet restore StageFrame.slnx
+        run: dotnet restore ai-stage.slnx
 
       - name: Build
-        run: dotnet build StageFrame.slnx -c Release --no-restore --nologo
+        run: dotnet build ai-stage.slnx -c Release --no-restore --nologo
 
       - name: Publish (smoke-test the bundle)
         run: pwsh build/publish.ps1

@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AgentSessions/AgentSessions.csproj" />
+    <Project Path="src/ai-frame/ai-frame.csproj" />
+    <Project Path="src/ai-stage/ai-stage.csproj" />
+  </Folder>
+</Solution>

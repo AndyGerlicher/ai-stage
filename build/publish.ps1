@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-    Builds and publishes Stage and Frame to publish/Stage as a self-contained
+    Builds and publishes ai-stage and ai-frame to publish/ai-stage as a self-contained
     win-x64 bundle ready for `vpk pack`.
 .DESCRIPTION
-    Both apps are published into the same output directory so Stage.exe and
-    Frame.exe sit side-by-side. Stage's FrameLauncher discovers Frame.exe in
+    Both apps are published into the same output directory so ai-stage.exe and
+    ai-frame.exe sit side-by-side. ai-stage's FrameLauncher discovers ai-frame.exe in
     that directory at runtime.
 #>
 [CmdletBinding()]
@@ -15,7 +15,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot   = Split-Path $PSScriptRoot -Parent
-$publishDir = Join-Path $repoRoot 'publish/Stage'
+$publishDir = Join-Path $repoRoot 'publish/ai-stage'
 
 if (Test-Path $publishDir)
 {
@@ -23,8 +23,8 @@ if (Test-Path $publishDir)
 }
 
 $apps = @(
-    @{ Name = 'Stage'; Project = 'src/Stage/Stage.csproj' }
-    @{ Name = 'Frame'; Project = 'src/Frame/Frame.csproj' }
+    @{ Name = 'ai-stage'; Project = 'src/ai-stage/ai-stage.csproj' }
+    @{ Name = 'ai-frame'; Project = 'src/ai-frame/ai-frame.csproj' }
 )
 
 foreach ($app in $apps)

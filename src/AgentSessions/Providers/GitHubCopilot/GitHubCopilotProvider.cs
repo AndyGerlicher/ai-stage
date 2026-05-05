@@ -13,7 +13,7 @@ public sealed class GitHubCopilotProvider : IAgentProvider
     public string DisplayName => "Copilot";
 
     /// <summary>
-    /// Returns the command Frame should run to start the GitHub Copilot CLI.
+    /// Returns the command ai-frame should run to start the GitHub Copilot CLI.
     /// When <paramref name="initialPromptFile"/> is supplied and exists, the
     /// command is wrapped in a PowerShell shim that reads the prompt and
     /// passes it via <c>-i</c>, deleting the file afterwards so each prompt

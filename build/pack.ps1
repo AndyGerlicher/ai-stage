@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Packs the published Stage+Frame bundle into a Velopack release.
+    Packs the published ai-stage + ai-frame bundle into a Velopack release.
 .DESCRIPTION
     Runs build/publish.ps1 first (unless -SkipPublish), then invokes the
     `vpk` global tool to produce a Setup.exe + nupkg + RELEASES under
@@ -17,9 +17,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot    = Split-Path $PSScriptRoot -Parent
-$publishDir  = Join-Path $repoRoot 'publish/Stage'
+$publishDir  = Join-Path $repoRoot 'publish/ai-stage'
 $releasesDir = Join-Path $repoRoot 'Releases'
-$icon        = Join-Path $repoRoot 'src/Stage/app.ico'
+$icon        = Join-Path $repoRoot 'src/ai-stage/app.ico'
 
 if (-not (Get-Command vpk -ErrorAction SilentlyContinue))
 {
@@ -33,19 +33,19 @@ if (-not $SkipPublish)
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
-if (-not (Test-Path (Join-Path $publishDir 'Stage.exe')))
+if (-not (Test-Path (Join-Path $publishDir 'ai-stage.exe')))
 {
-    Write-Host "Stage.exe not found in $publishDir. Run publish.ps1 first." -ForegroundColor Red
+    Write-Host "ai-stage.exe not found in $publishDir. Run publish.ps1 first." -ForegroundColor Red
     exit 1
 }
 
-Write-Host "Packing StageFrame $Version..." -ForegroundColor Cyan
+Write-Host "Packing ai-stage $Version..." -ForegroundColor Cyan
 vpk pack `
-    --packId StageFrame `
+    --packId ai-stage `
     --packVersion $Version `
     --packDir $publishDir `
-    --mainExe Stage.exe `
-    --packTitle 'Stage' `
+    --mainExe ai-stage.exe `
+    --packTitle 'ai-stage' `
     --icon $icon `
     --channel $Channel `
     --outputDir $releasesDir

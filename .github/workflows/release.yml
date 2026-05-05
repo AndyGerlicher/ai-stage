@@ -59,12 +59,12 @@ jobs:
       - name: Pack
         run: |
           vpk pack `
-            --packId StageFrame `
+            --packId ai-stage `
             --packVersion ${{ steps.ver.outputs.version }} `
-            --packDir publish/Stage `
-            --mainExe Stage.exe `
-            --packTitle 'Stage' `
-            --icon src/Stage/app.ico `
+            --packDir publish/ai-stage `
+            --mainExe ai-stage.exe `
+            --packTitle 'ai-stage' `
+            --icon src/ai-stage/app.ico `
             --outputDir Releases
 
       - name: Upload to GitHub Releases
@@ -75,13 +75,13 @@ jobs:
             --repoUrl https://github.com/${{ github.repository }} `
             --token $env:GITHUB_TOKEN `
             --tag v${{ steps.ver.outputs.version }} `
-            --releaseName 'StageFrame ${{ steps.ver.outputs.version }}' `
+            --releaseName 'ai-stage ${{ steps.ver.outputs.version }}' `
             --publish `
             --outputDir Releases
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: stageframe-${{ steps.ver.outputs.version }}
+          name: ai-stage-${{ steps.ver.outputs.version }}
           path: Releases/
           retention-days: 14

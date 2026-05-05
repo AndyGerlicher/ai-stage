@@ -23,7 +23,7 @@ public static class AgentRegistry
         s_default = ghCopilot;
 
         // Claude Code is also always registered. It is selected by id, either
-        // via the Frame --agent flag or by a host calling SetDefault.
+        // via the ai-frame --agent flag or by a host calling SetDefault.
         s_providers.Add(new ClaudeCodeProvider());
     }
 
