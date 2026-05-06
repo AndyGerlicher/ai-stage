@@ -9,8 +9,9 @@ public partial class App : Application
     private void OnStartup(object sender, StartupEventArgs e)
     {
         // VelopackApp.Build().Run() runs in Program.Main before this point.
-        // Fire-and-forget background update check. Applies on next exit.
-        _ = UpdateService.CheckAsync();
+        // Kick off the long-lived periodic update checker; surfaces status to the
+        // title strip via UpdateService.StatusChanged.
+        UpdateService.Start();
 
         ShutdownMode = ShutdownMode.OnMainWindowClose;
 

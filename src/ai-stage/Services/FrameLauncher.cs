@@ -19,7 +19,7 @@ internal static class FrameLauncher
     /// 4. PATH search for ai-frame.exe then ai-frame.cmd
     /// 5. Fallback: "ai-frame.exe" via shell execute
     /// </summary>
-    private static string? ResolveFrame()
+    internal static string? ResolveFrame()
     {
         try
         {
