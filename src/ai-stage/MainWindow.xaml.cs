@@ -1,10 +1,12 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using AgentSessions;
 using AiStage.Models;
 using AiStage.Services;
@@ -51,6 +53,13 @@ public partial class MainWindow : Window
     private IAgentSessionStore? _agentStore;
     private AgentSessionRowBinder? _agentBinder;
 
+    /// <summary>
+    /// Set true once the user has confirmed a "close anyway" prompt (either via the
+    /// X-button close path or via the apply-update flow), so we don't double-prompt
+    /// when the resulting <see cref="Window.Closing"/> event fires.
+    /// </summary>
+    private bool _closeGuardBypassed;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -62,6 +71,8 @@ public partial class MainWindow : Window
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         VersionText.Text = FormatVersion();
+        UpdateService.StatusChanged += OnUpdateStatusChanged;
+        ApplyUpdateStatus(UpdateService.CurrentStatus);
 
         RepoTree.ItemsSource = _repos;
 
@@ -77,6 +88,7 @@ public partial class MainWindow : Window
 
         Closed += (_, _) =>
         {
+            UpdateService.StatusChanged -= OnUpdateStatusChanged;
             _agentBinder?.Dispose();
             _agentStore?.Dispose();
         };
@@ -484,5 +496,194 @@ public partial class MainWindow : Window
         string hash = informational[(plus + 1)..];
         if (hash.Length > 7) hash = hash[..7];
         return $"{version} {hash}";
+    }
+
+    // ---- Update status indicator ----
+
+    private static readonly SolidColorBrush UpdateDotGreen = MakeFrozen(Color.FromRgb(0x3f, 0xb9, 0x50));
+    private static readonly SolidColorBrush UpdateDotYellow = MakeFrozen(Color.FromRgb(0xd2, 0x99, 0x22));
+    private static readonly SolidColorBrush UpdateDotError = MakeFrozen(Color.FromRgb(0x88, 0x88, 0x88));
+
+    private static SolidColorBrush MakeFrozen(Color c)
+    {
+        var b = new SolidColorBrush(c);
+        b.Freeze();
+        return b;
+    }
+
+    private void OnUpdateStatusChanged(object? sender, UpdateStatusInfo info) => ApplyUpdateStatus(info);
+
+    private void ApplyUpdateStatus(UpdateStatusInfo info)
+    {
+        switch (info.Status)
+        {
+            case UpdateStatus.UpToDate:
+                UpdateStatusButton.Tag = UpdateDotGreen;
+                UpdateStatusButton.ToolTip = info.LastCheckedUtc is { } t
+                    ? $"Up to date — last checked {t.ToLocalTime():HH:mm}"
+                    : "Up to date";
+                UpdateStatusButton.Cursor = null;
+                UpdateStatusButton.IsEnabled = false;
+                UpdateStatusButton.Visibility = Visibility.Visible;
+                break;
+
+            case UpdateStatus.UpdateAvailable:
+                UpdateStatusButton.Tag = UpdateDotYellow;
+                UpdateStatusButton.ToolTip = string.IsNullOrEmpty(info.AvailableVersion)
+                    ? "Update available — click to install"
+                    : $"Update {info.AvailableVersion} available — click to install";
+                UpdateStatusButton.Cursor = Cursors.Hand;
+                UpdateStatusButton.IsEnabled = true;
+                UpdateStatusButton.Visibility = Visibility.Visible;
+                break;
+
+            case UpdateStatus.Error:
+                UpdateStatusButton.Tag = UpdateDotError;
+                UpdateStatusButton.ToolTip = string.IsNullOrEmpty(info.ErrorMessage)
+                    ? "Update check failed — will retry"
+                    : $"Update check failed: {info.ErrorMessage}";
+                UpdateStatusButton.Cursor = null;
+                UpdateStatusButton.IsEnabled = false;
+                UpdateStatusButton.Visibility = Visibility.Visible;
+                break;
+
+            case UpdateStatus.NotInstalled:
+                // Dev / unmanaged layout — Velopack isn't in charge so we have nothing to
+                // poll for. Surface a muted dot anyway so the wiring is visible during
+                // development (and the user knows why click-to-update doesn't work).
+                UpdateStatusButton.Tag = UpdateDotError;
+                UpdateStatusButton.ToolTip = "Dev build — updates disabled";
+                UpdateStatusButton.Cursor = null;
+                UpdateStatusButton.IsEnabled = false;
+                UpdateStatusButton.Visibility = Visibility.Visible;
+                break;
+
+            default:
+                // Unknown / Checking — keep the dot hidden so the title bar stays quiet
+                // before the first check completes.
+                UpdateStatusButton.Visibility = Visibility.Collapsed;
+                break;
+        }
+    }
+
+    private async void OnUpdateStatusClick(object sender, RoutedEventArgs e)
+    {
+        var info = UpdateService.CurrentStatus;
+        if (info.Status != UpdateStatus.UpdateAvailable)
+            return;
+
+        // Hard block when ai-frame instances are running — Velopack will replace
+        // ai-frame.exe alongside ai-stage.exe, and Windows holds locks on running
+        // executables. Letting the user "update anyway" here would leave a partially
+        // swapped install. Tell them what to close, return, and let them retry.
+        var openFrames = FrameInstanceProbe.FindRunning();
+        if (openFrames.Count > 0)
+        {
+            var detail = new StringBuilder();
+            foreach (var f in openFrames)
+                detail.AppendLine($"PID {f.Pid} — {f.MainWindowTitle}");
+
+            string blockMsg = openFrames.Count == 1
+                ? "Close the open ai-frame window first, then click the update indicator again."
+                : $"Close the {openFrames.Count} open ai-frame windows first, then click the update indicator again.";
+
+            MessageBox.Show(
+                this,
+                blockMsg + "\n\n" + detail.ToString().TrimEnd(),
+                "ai-frame still running",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        string label = string.IsNullOrEmpty(info.AvailableVersion)
+            ? "Restart ai-stage to install the latest update?"
+            : $"Restart ai-stage to install version {info.AvailableVersion}?";
+        var dlg = new ConfirmDialog(
+            "Install update",
+            label,
+            "ai-stage will exit, apply the update, and relaunch on the new version.",
+            confirmLabel: "Restart and update")
+        { Owner = this };
+
+        if (dlg.ShowDialog() != true) return;
+
+        // Re-probe just before applying — a frame could have been launched while the
+        // confirm prompt was up. If so, abort and let the user clean up.
+        openFrames = FrameInstanceProbe.FindRunning();
+        if (openFrames.Count > 0)
+        {
+            MessageBox.Show(
+                this,
+                "An ai-frame window was opened while the prompt was showing. Close it and try again.",
+                "ai-frame still running",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        UpdateStatusButton.IsEnabled = false;
+        try
+        {
+            // Stage the apply-on-exit + relaunch BEFORE flipping the close-guard or
+            // shutting down — if Velopack throws, we still have a working app.
+            await UpdateService.ApplyAndRestartAsync();
+            _closeGuardBypassed = true;
+            Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusButton.IsEnabled = true;
+            MessageBox.Show(
+                this,
+                $"Could not apply the update:\n\n{ex.Message}\n\nai-stage will retry on the next interval.",
+                "Update failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    // ---- Close guard ----
+
+    private void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (_closeGuardBypassed) return;
+        if (!ConfirmCloseWithFramesOpen())
+        {
+            e.Cancel = true;
+            return;
+        }
+        _closeGuardBypassed = true; // any later Closing pass is a no-op
+    }
+
+    /// <summary>
+    /// On a normal user-initiated close, warns when ai-frame instances spawned from this
+    /// install are still running. Killing ai-stage doesn't actually break those sessions
+    /// (ai-frame is independent), but it's surprising — the prompt makes the orphaning
+    /// explicit. Returns true when it's safe to proceed (no frames, or user chose to
+    /// close anyway), false when the user cancelled. The update flow uses a stricter,
+    /// non-overridable check in <see cref="OnUpdateStatusClick"/> instead.
+    /// </summary>
+    private bool ConfirmCloseWithFramesOpen()
+    {
+        var frames = FrameInstanceProbe.FindRunning();
+        if (frames.Count == 0) return true;
+
+        var detail = new StringBuilder();
+        foreach (var f in frames)
+            detail.AppendLine($"PID {f.Pid} — {f.MainWindowTitle}");
+
+        string message = frames.Count == 1
+            ? "An ai-frame window is still open. Closing ai-stage will leave it running on its own."
+            : $"{frames.Count} ai-frame windows are still open. Closing ai-stage will leave them running on their own.";
+
+        var dlg = new ConfirmDialog(
+            "ai-frame still running",
+            message,
+            detail.ToString().TrimEnd(),
+            confirmLabel: "Close anyway")
+        { Owner = this };
+
+        return dlg.ShowDialog() == true;
     }
 }

@@ -12,6 +12,7 @@
         ResizeMode="CanResizeWithGrip"
         WindowStartupLocation="CenterScreen"
         Loaded="OnLoaded"
+        Closing="OnClosing"
         KeyDown="OnKeyDown">
 
     <shell:WindowChrome.WindowChrome>
@@ -314,6 +315,24 @@
                                FontSize="11" FontFamily="Segoe UI"
                                FontStyle="Italic"
                                VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    <Button x:Name="UpdateStatusButton" Click="OnUpdateStatusClick"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            Background="Transparent" BorderThickness="0"
+                            Padding="2" Margin="6,0,0,0"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed"
+                            Focusable="False"
+                            ToolTipService.ShowOnDisabled="True"
+                            ToolTip="">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                    <Ellipse Width="8" Height="8"
+                                             Fill="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
                 </StackPanel>
                 <TextBlock x:Name="RootPathText" Text="" Foreground="#666"
                            VerticalAlignment="Center" HorizontalAlignment="Center"
