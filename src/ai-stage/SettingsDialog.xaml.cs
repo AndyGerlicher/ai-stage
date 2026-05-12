@@ -74,6 +74,16 @@ public partial class SettingsDialog : Window
         if (ConsoleShellCombo.SelectedIndex < 0)
             ConsoleShellCombo.SelectedIndex = 0;
 
+        var editors = new List<ShellChoice>
+        {
+            new("code-insiders", "VS Code Insiders (default)"),
+            new("code",          "VS Code"),
+        };
+        EditorCombo.ItemsSource = editors;
+        EditorCombo.SelectedValue = current.PreferredEditor ?? "code-insiders";
+        if (EditorCombo.SelectedIndex < 0)
+            EditorCombo.SelectedIndex = 0;
+
         // Build the agent dropdown from the registry. Prepend a "(use default)"
         // entry mapped to a null id so users can opt out of forcing a specific
         // provider — ai-frame falls back to its own built-in default.
@@ -130,6 +140,7 @@ public partial class SettingsDialog : Window
         // user value here and let the next Load() pass apply normalization.
         string? selectedAgentId = AgentCombo.SelectedValue as string;
         string? selectedShell = ConsoleShellCombo.SelectedValue as string;
+        string? selectedEditor = EditorCombo.SelectedValue as string;
 
         // Reset commands: persist null if the user left it equal to the
         // default, so future default changes naturally take effect.
@@ -161,6 +172,7 @@ public partial class SettingsDialog : Window
             WorktreeResetCommands = persistedResetCommands,
             ConsoleShell = string.IsNullOrEmpty(selectedShell) || selectedShell == "VsDevCmd" ? null : selectedShell,
             ConsoleInitCommand = string.IsNullOrWhiteSpace(ConsoleInitBox.Text) ? null : ConsoleInitBox.Text,
+            PreferredEditor = string.IsNullOrEmpty(selectedEditor) || selectedEditor == "code-insiders" ? null : selectedEditor,
             AgentArgs = agentArgs,
         };
 

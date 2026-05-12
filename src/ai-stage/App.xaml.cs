@@ -49,6 +49,7 @@ public partial class App : Application
             WorktreeResetCommands = config.WorktreeResetCommands ?? StageConfig.DefaultWorktreeResetCommands,
             ConsoleShell = config.ConsoleShell,
             ConsoleInitCommand = config.ConsoleInitCommand,
+            PreferredEditor = config.PreferredEditor,
             AgentArgs = config.AgentArgs ?? new System.Collections.Generic.Dictionary<string, string>(),
         };
         MainWindow = window;

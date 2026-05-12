@@ -23,6 +23,7 @@ public partial class App : Application
         string? branchPrefix = null;
         string? consoleShellRaw = null;
         string? consoleInit = null;
+        string? preferredEditor = null;
 
         // Parse CLI args: first non-flag value is the folder.
         // --initial-prompt-file <path>     optional seed prompt
@@ -33,6 +34,7 @@ public partial class App : Application
         // --branch-prefix <value>          override the branch prefix stripped from the window title
         // --console-shell <kind>           Console tab shell: VsDevCmd | PowerShell | Cmd
         // --console-init "<line>"          command to run in the Console tab after shell init
+        // --preferred-editor <cmd>         executable for the "Open in editor" toolbar button (default: code-insiders)
         for (int i = 0; i < e.Args.Length; i++)
         {
             string arg = e.Args[i];
@@ -82,6 +84,12 @@ public partial class App : Application
                 && i + 1 < e.Args.Length)
             {
                 consoleInit = e.Args[++i];
+                continue;
+            }
+            if (string.Equals(arg, "--preferred-editor", StringComparison.OrdinalIgnoreCase)
+                && i + 1 < e.Args.Length)
+            {
+                preferredEditor = e.Args[++i];
                 continue;
             }
 
@@ -152,6 +160,8 @@ public partial class App : Application
             AgentArgs = agentArgs,
             ConsoleInitCommand = consoleInit,
         };
+        if (!string.IsNullOrEmpty(preferredEditor))
+            window.PreferredEditor = preferredEditor;
         if (consoleShellRaw is not null
             && Enum.TryParse<AiFrame.Services.ConsoleShell>(consoleShellRaw, ignoreCase: true, out var parsedShell))
         {

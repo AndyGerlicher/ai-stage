@@ -123,7 +123,7 @@
 
                     <!-- Open in VS Code Insiders -->
                     <Button Content="&#xE943;" Click="OnOpenInVSCodeInsidersClick"
-                            Style="{StaticResource CaptionButtonStyle}" ToolTip="Open in VS Code Insiders"
+                            Style="{StaticResource CaptionButtonStyle}" ToolTip="Open in VS Code"
                             FontSize="14"/>
 
                     <!-- Separator -->

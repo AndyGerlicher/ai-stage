@@ -66,6 +66,13 @@ internal sealed class StageConfig
     public string? ConsoleInitCommand { get; set; }
 
     /// <summary>
+    /// Command name ai-frame's "Open in editor" toolbar button invokes.
+    /// Null = default (<c>"code-insiders"</c>); <c>"code"</c> selects stable VS Code.
+    /// Persisted as null when the default is chosen so future default changes flow through.
+    /// </summary>
+    public string? PreferredEditor { get; set; }
+
+    /// <summary>
     /// Per-provider CLI argument overrides, keyed by <see cref="IAgentProvider.Id"/>.
     /// Each value is the extra args ai-frame appends to that provider's
     /// invocation (e.g. <c>"--allow-all-tools"</c> for github-copilot).
