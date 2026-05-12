@@ -5,7 +5,9 @@ public enum ConsoleShell
 {
     /// <summary>cmd.exe with VS Developer Command Prompt env loaded (default).</summary>
     VsDevCmd,
-    /// <summary>powershell.exe (Windows PowerShell).</summary>
+    /// <summary>pwsh.exe (PowerShell).</summary>
+    Pwsh,
+    /// <summary>powershell.exe (Old PowerShell).</summary>
     PowerShell,
     /// <summary>cmd.exe (no VsDevCmd env).</summary>
     Cmd,
@@ -22,6 +24,6 @@ internal sealed record TerminalLaunchSpec(ConsoleShell Shell, string? InitComman
     public static TerminalLaunchSpec ConsoleDefault { get; } = new(ConsoleShell.VsDevCmd, null);
 
     /// <summary>Spec for the agent tab: VsDevCmd shell, agent CLI as the init command.</summary>
-    public static TerminalLaunchSpec ForAgent(string agentCommand) =>
-        new(ConsoleShell.VsDevCmd, agentCommand);
+    public static TerminalLaunchSpec ForAgent(ConsoleShell consoleShell, string agentCommand) =>
+        new(consoleShell, agentCommand);
 }

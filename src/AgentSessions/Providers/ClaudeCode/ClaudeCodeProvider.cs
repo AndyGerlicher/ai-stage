@@ -10,10 +10,10 @@ public sealed class ClaudeCodeProvider : IAgentProvider
     public const string ProviderId = "claude-code";
 
     /// <summary>Default arguments appended after <c>claude</c> when the host
-    /// doesn't specify <paramref name="extraArgs"/>. <c>--dangerously-skip-permissions</c>
+    /// doesn't specify <paramref name="extraArgs"/>. 'Auto Mode' (set and remembered in Claude)
     /// is Claude Code's equivalent of GitHub Copilot's <c>--allow-all-tools</c>:
     /// it suppresses the per-tool permission prompts.</summary>
-    public const string ClaudeDefaultExtraArgs = "--dangerously-skip-permissions";
+    public const string ClaudeDefaultExtraArgs = "";
 
     public string Id => ProviderId;
     public string DisplayName => "Claude Code";
@@ -46,7 +46,7 @@ public sealed class ClaudeCodeProvider : IAgentProvider
             $"Remove-Item -LiteralPath '{escapedPath}' -ErrorAction SilentlyContinue; " +
             $"{baseCmd} $p";
 
-        return $"powershell -NoProfile -ExecutionPolicy Bypass -Command \"{psCommand}\"";
+        return $"pwsh -NoProfile -ExecutionPolicy Bypass -Command \"{psCommand}\"";
     }
 
     public IAgentSessionStore CreateSessionStore() => new ClaudeCodeSessionMonitor();

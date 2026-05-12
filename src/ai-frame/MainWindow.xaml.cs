@@ -108,7 +108,7 @@ public partial class MainWindow : Window
 
         string? vsDevCmdPath = VsDevCmd.ResolvePath();
 
-        var agentSpec = TerminalLaunchSpec.ForAgent(command);
+        var agentSpec = TerminalLaunchSpec.ForAgent(ConsoleShell, command);
         var consoleSpec = new TerminalLaunchSpec(ConsoleShell, ConsoleInitCommand);
 
         try

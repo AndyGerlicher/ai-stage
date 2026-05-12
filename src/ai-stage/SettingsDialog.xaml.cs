@@ -65,7 +65,8 @@ public partial class SettingsDialog : Window
         var shells = new List<ShellChoice>
         {
             new("VsDevCmd",   "VS Developer Command Prompt (default)"),
-            new("PowerShell", "PowerShell"),
+            new("Pwsh", "PowerShell"),
+            new("PowerShell", "PowerShell (old)"),
             new("Cmd",        "Cmd (no VsDevCmd)"),
         };
         ConsoleShellCombo.ItemsSource = shells;
