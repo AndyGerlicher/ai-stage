@@ -45,6 +45,10 @@ public partial class MainWindow : Window
     /// <summary>Optional console-tab init command line forwarded to ai-frame.</summary>
     public string? ConsoleInitCommand { get; set; }
 
+    /// <summary>Preferred editor command (e.g. <c>"code"</c> or <c>"code-insiders"</c>)
+    /// forwarded to ai-frame; null = ai-frame's built-in default.</summary>
+    public string? PreferredEditor { get; set; }
+
     /// <summary>Per-provider CLI argument overrides; missing key = use provider default.</summary>
     public Dictionary<string, string> AgentArgs { get; set; } = new();
 
@@ -190,7 +194,8 @@ public partial class MainWindow : Window
             branchPrefix: BranchPrefix,
             consoleShell: ConsoleShell,
             consoleInit: ConsoleInitCommand,
-            agentArgs: agentArgs);
+            agentArgs: agentArgs,
+            preferredEditor: PreferredEditor);
     }
 
     private async void OnNewWorktreeClick(object sender, RoutedEventArgs e)
@@ -253,7 +258,8 @@ public partial class MainWindow : Window
             branchPrefix: BranchPrefix,
             consoleShell: ConsoleShell,
             consoleInit: ConsoleInitCommand,
-            agentArgs: newAgentArgs);
+            agentArgs: newAgentArgs,
+            preferredEditor: PreferredEditor);
     }
 
     private async void OnResetWorktreeClick(object sender, RoutedEventArgs e)

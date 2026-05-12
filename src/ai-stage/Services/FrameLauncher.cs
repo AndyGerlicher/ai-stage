@@ -75,8 +75,10 @@ internal static class FrameLauncher
     /// Launches ai-frame on a folder, optionally passing an initial-prompt file,
     /// an agent provider id (forwarded as <c>--agent &lt;id&gt;</c>),
     /// the configured branch prefix (forwarded as <c>--branch-prefix &lt;value&gt;</c>),
-    /// and ai-stage's per-tab customization (Console shell + init command,
-    /// agent extra args). Shows a MessageBox with install hint if launch fails.
+    /// ai-stage's per-tab customization (Console shell + init command, agent
+    /// extra args), and the preferred editor command (forwarded as
+    /// <c>--preferred-editor &lt;cmd&gt;</c>). Shows a MessageBox with install
+    /// hint if launch fails.
     /// </summary>
     public static bool Launch(
         string folder,
@@ -85,7 +87,8 @@ internal static class FrameLauncher
         string? branchPrefix = null,
         string? consoleShell = null,
         string? consoleInit = null,
-        string? agentArgs = null)
+        string? agentArgs = null,
+        string? preferredEditor = null)
     {
         string? frame = ResolveFrame();
 
@@ -107,6 +110,8 @@ internal static class FrameLauncher
         // the provider's built-in default.
         if (agentArgs is not null)
             args.Add($"--agent-args \"{EscapeQuotes(agentArgs)}\"");
+        if (!string.IsNullOrEmpty(preferredEditor))
+            args.Add($"--preferred-editor \"{preferredEditor}\"");
         string argString = string.Join(' ', args);
 
         ProcessStartInfo startInfo;

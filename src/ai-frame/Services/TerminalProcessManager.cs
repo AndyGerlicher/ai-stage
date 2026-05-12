@@ -47,6 +47,7 @@ internal sealed class TerminalProcessManager : IDisposable
             FileName = "wt.exe",
             Arguments = args,
             UseShellExecute = false,
+            WindowStyle = ProcessWindowStyle.Hidden
         };
 
         _process = Process.Start(startInfo);
@@ -81,6 +82,17 @@ internal sealed class TerminalProcessManager : IDisposable
                 // PowerShell single-quote escape: '' inside a '...' literal.
                 string escaped = spec.InitCommand.Replace("'", "''");
                 return $"powershell.exe -NoExit -Command \"& {{ {escaped} }}\"";
+            }
+            
+            case ConsoleShell.Pwsh:
+            {
+                // -NoExit keeps the prompt open after the init command runs.
+                if (string.IsNullOrWhiteSpace(spec.InitCommand))
+                    return "pwsh.exe -NoExit";
+
+                // PowerShell single-quote escape: '' inside a '...' literal.
+                string escaped = spec.InitCommand.Replace("'", "''");
+                return $"pwsh.exe -NoExit -Command \"& {{ {escaped} }}\"";
             }
 
             case ConsoleShell.Cmd:

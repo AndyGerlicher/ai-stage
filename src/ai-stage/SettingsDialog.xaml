@@ -307,6 +307,15 @@
                            Style="{StaticResource HintStyle}"/>
                 <TextBox x:Name="ConsoleInitBox" Style="{StaticResource MonoTextBoxStyle}"/>
 
+                <!-- ───────── Editor ───────── -->
+                <TextBlock Text="EDITOR" Style="{StaticResource SectionHeaderStyle}"/>
+
+                <TextBlock Text="Preferred editor" Style="{StaticResource LabelStyle}"/>
+                <TextBlock Text="Which editor ai-frame's toolbar button opens. Requires the chosen command (code-insiders or code) to be on PATH."
+                           Style="{StaticResource HintStyle}"/>
+                <ComboBox x:Name="EditorCombo" Style="{StaticResource DarkComboBoxStyle}"
+                          DisplayMemberPath="Label" SelectedValuePath="Value"/>
+
                 <!-- ───────── Agent ───────── -->
                 <TextBlock Text="AGENT" Style="{StaticResource SectionHeaderStyle}"/>
 

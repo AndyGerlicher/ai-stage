@@ -42,6 +42,11 @@ public partial class MainWindow : Window
     /// <summary>Optional command line to execute in the Console tab after shell init.</summary>
     public string? ConsoleInitCommand { get; set; }
 
+    /// <summary>Executable name invoked by the "Open in editor" toolbar button.
+    /// Set by ai-stage via <c>--preferred-editor</c>; defaults to <c>"code-insiders"</c>
+    /// for standalone ai-frame launches.</summary>
+    public string PreferredEditor { get; set; } = "code-insiders";
+
     /// <summary>Display name for the agent tab. Defaults to "Copilot" when unresolved.</summary>
     public string AgentDisplayName { get; private set; } = "Copilot";
 
@@ -108,7 +113,7 @@ public partial class MainWindow : Window
 
         string? vsDevCmdPath = VsDevCmd.ResolvePath();
 
-        var agentSpec = TerminalLaunchSpec.ForAgent(command);
+        var agentSpec = TerminalLaunchSpec.ForAgent(ConsoleShell, command);
         var consoleSpec = new TerminalLaunchSpec(ConsoleShell, ConsoleInitCommand);
 
         try
@@ -231,7 +236,7 @@ public partial class MainWindow : Window
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName = "code-insiders",
+                FileName = PreferredEditor,
                 Arguments = $"\"{WorkingDirectory}\"",
                 WorkingDirectory = WorkingDirectory,
                 UseShellExecute = true,
@@ -240,8 +245,8 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show(
-                $"Could not launch VS Code Insiders:\n{ex.Message}",
-                "Open in VS Code Insiders",
+                $"Could not launch editor ({PreferredEditor}):\n{ex.Message}",
+                "Open in editor",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
