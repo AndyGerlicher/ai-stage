@@ -163,15 +163,28 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Opens a row's folder. If a live agent session already targets that
-    /// folder, brings its terminal window to the front; otherwise launches
-    /// ai-frame. The agent id forwarded to ai-frame is, in priority order:
-    ///   1. the existing session's <c>ProviderId</c> (when one is found),
-    ///   2. <see cref="DefaultAgentProvider"/> from ai-stage config,
-    ///   3. null (ai-frame falls back to its built-in default).
+    /// Opens a row's folder. Focus strategy, in order:
+    ///   1. If a running <c>ai-frame.exe</c> has this folder as its
+    ///      positional argument, bring its top-level WPF window forward
+    ///      (<see cref="FrameWindowActivator"/>). This is the common case;
+    ///      it also covers ai-frame windows that opened before any agent
+    ///      session was detected.
+    ///   2. Else, if a live agent session targets this folder, walk the
+    ///      agent process's parent chain to find the hosting terminal
+    ///      window (<see cref="AgentSessionLauncher.TryFocus(AgentSession)"/>).
+    ///      Serves agents running outside ai-frame (e.g. plain Windows
+    ///      Terminal launched by the user).
+    ///   3. Else, launch a new ai-frame. The agent id forwarded is, in
+    ///      priority order:
+    ///        a. the existing session's <c>ProviderId</c> (when one is found),
+    ///        b. <see cref="DefaultAgentProvider"/> from ai-stage config,
+    ///        c. null (ai-frame falls back to its built-in default).
     /// </summary>
     private void OpenPath(string path)
     {
+        if (FrameWindowActivator.TryFocus(path))
+            return;
+
         var session = _agentBinder?.FindSessionForPath(path);
         if (session is not null && AgentSessionLauncher.TryFocus(session))
             return;
