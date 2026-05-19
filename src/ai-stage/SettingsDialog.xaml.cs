@@ -36,6 +36,9 @@ public partial class SettingsDialog : Window
 
         RootPathBox.Text = current.RootPath ?? "";
         BranchPrefixBox.Text = current.BranchPrefix ?? "";
+        // Show the live value (ConfigService.Load already filled in the
+        // fallback when the user left the field blank).
+        DefaultBranchBox.Text = current.DefaultBranch ?? "";
 
         // Reset commands: show user value if customized, otherwise the default
         // so first-run users see the baseline they're editing from.
@@ -168,6 +171,9 @@ public partial class SettingsDialog : Window
         {
             RootPath = root,
             BranchPrefix = BranchPrefixBox.Text ?? string.Empty,
+            // Persist null when the user left it blank or equal to the
+            // fallback ("main"), so future fallback changes naturally apply.
+            DefaultBranch = NormalizeDefaultBranchForSave(DefaultBranchBox.Text),
             DefaultAgentProvider = string.IsNullOrEmpty(selectedAgentId) ? null : selectedAgentId,
             WorktreeResetCommands = persistedResetCommands,
             ConsoleShell = string.IsNullOrEmpty(selectedShell) || selectedShell == "VsDevCmd" ? null : selectedShell,
@@ -184,6 +190,24 @@ public partial class SettingsDialog : Window
     {
         DialogResult = false;
         Close();
+    }
+
+    /// <summary>
+    /// Maps the Settings textbox value back to the JSON shape:
+    /// blank or equal to the fallback ("main") → null so future default
+    /// changes flow through; "origin/main" is normalized to "main" so callers
+    /// don't end up with "origin/origin/main"; anything else round-trips
+    /// trimmed.
+    /// </summary>
+    private static string? NormalizeDefaultBranchForSave(string? raw)
+    {
+        string trimmed = (raw ?? "").Trim().Trim('/');
+        if (trimmed.StartsWith("origin/", StringComparison.OrdinalIgnoreCase))
+            trimmed = trimmed["origin/".Length..].Trim('/');
+        if (trimmed.Length == 0) return null;
+        if (string.Equals(trimmed, StageConfig.DefaultBranchFallback, StringComparison.OrdinalIgnoreCase))
+            return null;
+        return trimmed;
     }
 
     private void OnKeyDown(object sender, KeyEventArgs e)

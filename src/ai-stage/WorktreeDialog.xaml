@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="ai-stage — New worktree"
-        Width="480" Height="220"
-        MinWidth="400" MinHeight="180"
+        Width="520" Height="320"
+        MinWidth="440" MinHeight="240"
         Background="#1e1e1e"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
@@ -81,11 +81,53 @@
         </Border>
 
         <StackPanel Grid.Row="1" Margin="20,16,20,0">
-            <TextBlock Text="Branch name" Foreground="#aaa" FontSize="11" FontFamily="Segoe UI"/>
-            <TextBox x:Name="NameBox" Style="{StaticResource DarkTextBoxStyle}" Margin="0,4,0,0"/>
+            <!-- Mode picker (visible only in Reset mode) -->
+            <StackPanel x:Name="ModePanel" Orientation="Horizontal" Margin="0,0,0,10" Visibility="Collapsed">
+                <RadioButton x:Name="ModeNewBranchRadio" Content="New branch" GroupName="ResetMode"
+                             Foreground="#ddd" FontSize="12" FontFamily="Segoe UI"
+                             IsChecked="True" Checked="OnModeChanged" Margin="0,0,16,0"/>
+                <RadioButton x:Name="ModeExistingBranchRadio" Content="Existing branch" GroupName="ResetMode"
+                             Foreground="#ddd" FontSize="12" FontFamily="Segoe UI"
+                             Checked="OnModeChanged" Margin="0,0,16,0"/>
+                <RadioButton x:Name="ModeDefaultBranchRadio" Content="Default branch" GroupName="ResetMode"
+                             Foreground="#ddd" FontSize="12" FontFamily="Segoe UI"
+                             Checked="OnModeChanged"/>
+            </StackPanel>
+
+            <!-- New-branch input -->
+            <StackPanel x:Name="NewBranchPanel">
+                <TextBlock Text="Branch name" Foreground="#aaa" FontSize="11" FontFamily="Segoe UI"/>
+                <TextBox x:Name="NameBox" Style="{StaticResource DarkTextBoxStyle}" Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <!-- Existing-branch picker -->
+            <StackPanel x:Name="ExistingBranchPanel" Visibility="Collapsed">
+                <TextBlock Text="Existing remote branch" Foreground="#aaa" FontSize="11" FontFamily="Segoe UI"/>
+                <Grid Margin="0,4,0,0">
+                    <ComboBox x:Name="ExistingBranchCombo" IsEditable="True"
+                              Background="#2a2a2a" Foreground="#e8e8e8" BorderBrush="#444"
+                              FontFamily="Segoe UI" FontSize="13" Padding="6,4"
+                              SelectionChanged="OnExistingBranchChanged"
+                              KeyUp="OnExistingBranchTextChanged"/>
+                    <TextBlock x:Name="ExistingBranchLoadingText" Text="Fetching…"
+                               Foreground="#888" FontSize="11" FontFamily="Segoe UI"
+                               HorizontalAlignment="Right" VerticalAlignment="Center"
+                               Margin="0,0,28,0" Visibility="Collapsed" IsHitTestVisible="False"/>
+                </Grid>
+            </StackPanel>
+
+            <!-- Default-branch display -->
+            <StackPanel x:Name="DefaultBranchPanel" Visibility="Collapsed">
+                <TextBlock Text="Default branch" Foreground="#aaa" FontSize="11" FontFamily="Segoe UI"/>
+                <Border Background="#2a2a2a" BorderBrush="#444" BorderThickness="1"
+                        Padding="8,6" Margin="0,4,0,0">
+                    <TextBlock x:Name="DefaultBranchText" Text="" Foreground="#e8e8e8"
+                               FontSize="13" FontFamily="Consolas, Cascadia Mono, Segoe UI"/>
+                </Border>
+            </StackPanel>
 
             <TextBlock x:Name="PathHintText" Text="" Foreground="#666" FontSize="11"
-                       FontFamily="Segoe UI" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+                       FontFamily="Segoe UI" Margin="0,8,0,0" TextTrimming="CharacterEllipsis"/>
         </StackPanel>
 
         <Border Grid.Row="2" Background="#252525" Padding="20,10">

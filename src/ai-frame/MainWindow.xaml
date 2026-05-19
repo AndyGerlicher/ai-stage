@@ -150,10 +150,12 @@
                             Style="{StaticResource TabButtonStyle}" Tag="inactive"/>
                 </StackPanel>
 
-                <!-- Folder path (fills remaining center space) -->
-                <TextBlock x:Name="FolderPathText" Text="" Foreground="#666"
+                <!-- Project label (fills remaining center space). Renamed from
+                     FolderPathText: now shows "RepoName — branch" instead of
+                     the raw path, with the full path moved into the tooltip. -->
+                <TextBlock x:Name="ProjectLabelText" Text="" Foreground="#d0d0d0"
                            VerticalAlignment="Center" HorizontalAlignment="Center"
-                           FontSize="11" FontFamily="Segoe UI"
+                           FontSize="13" FontFamily="Segoe UI Semibold"
                            TextTrimming="CharacterEllipsis"/>
             </DockPanel>
         </Border>

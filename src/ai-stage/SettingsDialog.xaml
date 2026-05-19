@@ -284,9 +284,14 @@
                            Style="{StaticResource HintStyle}"/>
                 <TextBox x:Name="BranchPrefixBox" Style="{StaticResource DarkTextBoxStyle}"/>
 
+                <TextBlock Text="Default branch" Style="{StaticResource LabelStyle}" Margin="0,16,0,0"/>
+                <TextBlock Text="Branch that new worktrees and resets sync to (referenced as origin/&lt;branch&gt;). Defaults to main."
+                           Style="{StaticResource HintStyle}"/>
+                <TextBox x:Name="DefaultBranchBox" Style="{StaticResource DarkTextBoxStyle}"/>
+
                 <!-- ───────── Worktree reset ───────── -->
                 <TextBlock Text="WORKTREE RESET" Style="{StaticResource SectionHeaderStyle}"/>
-                <TextBlock Text="Commands to run when resetting a worktree, one per line. The token &lt;new-branch&gt; is replaced with the full branch name. Lines starting with # are ignored."
+                <TextBlock Text="Commands to run when resetting a worktree, one per line. Tokens: &lt;new-branch&gt; (local branch to land on) and &lt;target-ref&gt; (git ref to reset onto, e.g. origin/main). Lines starting with # are ignored."
                            Style="{StaticResource HintStyle}"/>
                 <TextBox x:Name="ResetCommandsBox" Style="{StaticResource MonoTextBoxStyle}"
                          Height="100" AcceptsReturn="True" TextWrapping="NoWrap"

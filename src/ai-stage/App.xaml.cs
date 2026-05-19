@@ -46,6 +46,8 @@ public partial class App : Application
             // from "explicit empty" (→ no prefix); ConfigService.Load guarantees
             // a non-null normalized value here.
             BranchPrefix = config.BranchPrefix!,
+            // ConfigService.Load normalizes null/empty to DefaultBranchFallback.
+            DefaultBranch = config.DefaultBranch!,
             WorktreeResetCommands = config.WorktreeResetCommands ?? StageConfig.DefaultWorktreeResetCommands,
             ConsoleShell = config.ConsoleShell,
             ConsoleInitCommand = config.ConsoleInitCommand,

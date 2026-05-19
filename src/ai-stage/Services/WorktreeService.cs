@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 
 namespace AiStage.Services;
 
@@ -12,12 +13,15 @@ internal sealed record WorktreeResult(bool Success, string? Path, string? Error)
 internal static class WorktreeService
 {
     /// <summary>
-    /// Creates a new worktree in the next available numbered slot, branching from origin/main.
+    /// Creates a new worktree in the next available numbered slot, branching from
+    /// <c>origin/&lt;defaultBranch&gt;</c>.
     /// </summary>
-    public static async Task<WorktreeResult> CreateAsync(string mainRepoPath, string branchPrefix, string branchSuffix, CancellationToken ct = default)
+    public static async Task<WorktreeResult> CreateAsync(string mainRepoPath, string branchPrefix, string branchSuffix, string defaultBranch, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(branchSuffix))
             return new WorktreeResult(false, null, "Branch name cannot be empty.");
+        if (string.IsNullOrWhiteSpace(defaultBranch))
+            defaultBranch = StageConfig.DefaultBranchFallback;
 
         string? parent = Path.GetDirectoryName(mainRepoPath);
         if (string.IsNullOrEmpty(parent))
@@ -42,9 +46,10 @@ internal static class WorktreeService
         await RunGitAsync(mainRepoPath, ["fetch"], ct);
 
         string fullBranch = branchPrefix + branchSuffix;
+        string targetRef = $"origin/{defaultBranch}";
 
-        // First attempt: create a new branch starting at origin/main.
-        var (ok, stderr) = await RunGitAsync(mainRepoPath, ["worktree", "add", "-b", fullBranch, targetPath, "origin/main"], ct);
+        // First attempt: create a new branch starting at origin/<defaultBranch>.
+        var (ok, stderr) = await RunGitAsync(mainRepoPath, ["worktree", "add", "-b", fullBranch, targetPath, targetRef], ct);
         if (ok)
             return new WorktreeResult(true, targetPath, null);
 
@@ -52,7 +57,7 @@ internal static class WorktreeService
         var (ok2, stderr2) = await RunGitAsync(mainRepoPath, ["worktree", "add", targetPath, fullBranch], ct);
         if (ok2)
         {
-            await RunGitAsync(targetPath, ["reset", "--hard", "origin/main"], ct);
+            await RunGitAsync(targetPath, ["reset", "--hard", targetRef], ct);
             return new WorktreeResult(true, targetPath, null);
         }
 
@@ -61,27 +66,31 @@ internal static class WorktreeService
     }
 
     /// <summary>
-    /// Resets an existing worktree by running the user-supplied
+    /// Resets an existing worktree by running the supplied
     /// <paramref name="resetCommands"/> (one command per line, executed via
-    /// <c>cmd.exe /c</c> in the worktree's working directory). The token
-    /// <c>&lt;new-branch&gt;</c> is replaced with the full branch name
-    /// (<paramref name="branchPrefix"/> + <paramref name="branchSuffix"/>).
+    /// <c>cmd.exe /c</c> in the worktree's working directory). Tokens
+    /// substituted in each command line:
+    /// <list type="bullet">
+    /// <item><c>&lt;new-branch&gt;</c> → <paramref name="newBranch"/> (the
+    /// local branch name to land on; may be empty for modes that do a
+    /// detached checkout).</item>
+    /// <item><c>&lt;target-ref&gt;</c> → <paramref name="targetRef"/> (the
+    /// git ref to reset onto, e.g. <c>origin/main</c>).</item>
+    /// </list>
     /// Aborts on the first non-zero exit and returns the failing line's stderr.
     /// </summary>
     public static async Task<WorktreeResult> ResetAsync(
         string mainRepoPath,
         string worktreePath,
-        string branchPrefix,
-        string branchSuffix,
+        string newBranch,
+        string targetRef,
         string resetCommands,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(branchSuffix))
-            return new WorktreeResult(false, null, "Branch name cannot be empty.");
+        if (string.IsNullOrWhiteSpace(targetRef))
+            return new WorktreeResult(false, null, "Target ref cannot be empty.");
         if (string.IsNullOrWhiteSpace(resetCommands))
             return new WorktreeResult(false, null, "Reset commands are empty (configure them in Settings).");
-
-        string fullBranch = branchPrefix + branchSuffix;
 
         // Run each non-empty / non-comment line through cmd.exe /c in the
         // worktree dir. Lines starting with '#' are ignored so users can
@@ -92,7 +101,9 @@ internal static class WorktreeService
             string line = raw.Trim();
             if (line.Length == 0 || line.StartsWith('#')) continue;
 
-            string command = line.Replace("<new-branch>", fullBranch, StringComparison.Ordinal);
+            string command = line
+                .Replace("<new-branch>", newBranch, StringComparison.Ordinal)
+                .Replace("<target-ref>", targetRef, StringComparison.Ordinal);
             var (ok, stderr) = await RunShellAsync(worktreePath, command, ct);
             if (!ok)
                 return new WorktreeResult(false, null, $"`{command}` failed:\n{stderr}");
@@ -181,6 +192,104 @@ internal static class WorktreeService
         catch (Exception ex)
         {
             return $"(error: {ex.Message})";
+        }
+    }
+
+    /// <summary>
+    /// Performs a detached-HEAD reset of <paramref name="worktreePath"/> onto
+    /// <paramref name="targetRef"/> by invoking <c>git</c> directly (no shell).
+    /// Used by ai-stage's "Existing branch" and "Default branch" reset modes,
+    /// where the target ref comes from user-pickable data (a remote branch
+    /// name from <see cref="ListRemoteBranchesAsync"/> or an editable ComboBox)
+    /// and must therefore not be interpolated into a shell command line.
+    /// Sequence:
+    /// <list type="number">
+    /// <item><c>git fetch</c> in the main repo.</item>
+    /// <item><c>git clean -fdx</c> in the worktree — drops untracked files
+    /// that would otherwise block the checkout.</item>
+    /// <item><c>git checkout --force --detach &lt;targetRef&gt;</c>.</item>
+    /// <item><c>git reset --hard &lt;targetRef&gt;</c>.</item>
+    /// <item><c>git clean -fdx</c> again — sweeps anything the checkout
+    /// reintroduced.</item>
+    /// </list>
+    /// Returns the first failing step's stderr on error.
+    /// </summary>
+    public static async Task<WorktreeResult> ResetToRefAsync(
+        string mainRepoPath,
+        string worktreePath,
+        string targetRef,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(targetRef))
+            return new WorktreeResult(false, null, "Target ref cannot be empty.");
+
+        // Fetch in the main repo so origin/* refs are current.
+        var (ok, stderr) = await RunGitAsync(mainRepoPath, ["fetch", "--prune"], ct);
+        // Tolerate fetch failure (offline mode); we'll surface a clearer error
+        // on checkout if the ref genuinely doesn't exist.
+
+        (ok, stderr) = await RunGitAsync(worktreePath, ["clean", "-fdx"], ct);
+        if (!ok) return new WorktreeResult(false, null, $"git clean failed:\n{stderr}");
+
+        (ok, stderr) = await RunGitAsync(worktreePath, ["checkout", "--force", "--detach", targetRef], ct);
+        if (!ok) return new WorktreeResult(false, null, $"git checkout {targetRef} failed:\n{stderr}");
+
+        (ok, stderr) = await RunGitAsync(worktreePath, ["reset", "--hard", targetRef], ct);
+        if (!ok) return new WorktreeResult(false, null, $"git reset --hard {targetRef} failed:\n{stderr}");
+
+        (ok, stderr) = await RunGitAsync(worktreePath, ["clean", "-fdx"], ct);
+        if (!ok) return new WorktreeResult(false, null, $"git clean failed:\n{stderr}");
+
+        return new WorktreeResult(true, worktreePath, null);
+    }
+
+    /// <summary>
+    /// Fetches from origin then returns the list of remote branch names
+    /// (with the <c>origin/</c> prefix stripped) sorted alphabetically.
+    /// Excludes the <c>HEAD</c> pseudo-ref. Returns an empty list on
+    /// failure (callers should treat this as "nothing to pick from").
+    /// </summary>
+    public static async Task<IReadOnlyList<string>> ListRemoteBranchesAsync(string mainRepoPath, CancellationToken ct = default)
+    {
+        // Best-effort fetch; ignore failures and try to list whatever we
+        // already have cached so the dialog is still usable offline.
+        await RunGitAsync(mainRepoPath, ["fetch", "--prune"], ct);
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = mainRepoPath,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        psi.ArgumentList.Add("for-each-ref");
+        psi.ArgumentList.Add("--format=%(refname:strip=3)");
+        psi.ArgumentList.Add("refs/remotes/origin");
+
+        try
+        {
+            using var proc = Process.Start(psi);
+            if (proc is null) return Array.Empty<string>();
+
+            string stdout = await proc.StandardOutput.ReadToEndAsync(ct);
+            await proc.WaitForExitAsync(ct);
+            if (proc.ExitCode != 0) return Array.Empty<string>();
+
+            var branches = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string raw in stdout.Replace("\r\n", "\n").Split('\n'))
+            {
+                string name = raw.Trim();
+                if (name.Length == 0) continue;
+                if (string.Equals(name, "HEAD", StringComparison.OrdinalIgnoreCase)) continue;
+                branches.Add(name);
+            }
+            return branches.ToArray();
+        }
+        catch
+        {
+            return Array.Empty<string>();
         }
     }
 

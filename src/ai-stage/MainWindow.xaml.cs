@@ -33,6 +33,14 @@ public partial class MainWindow : Window
     public string BranchPrefix { get; set; } = StageConfig.DefaultBranchPrefix;
 
     /// <summary>
+    /// Name of the branch ai-stage syncs new and reset worktrees to. Loaded
+    /// from <see cref="StageConfig.DefaultBranch"/>; <see cref="Services.ConfigService.Load"/>
+    /// guarantees a non-empty value here (falls back to <see cref="StageConfig.DefaultBranchFallback"/>
+    /// for null/empty user input).
+    /// </summary>
+    public string DefaultBranch { get; set; } = StageConfig.DefaultBranchFallback;
+
+    /// <summary>
     /// Commands run by the "Reset worktree" action, one per line. Loaded from
     /// <see cref="StageConfig.WorktreeResetCommands"/>; ConfigService.Load
     /// substitutes the default if the user hasn't customized it.
@@ -220,7 +228,7 @@ public partial class MainWindow : Window
         string worktreeRoot = Path.Combine(Path.GetDirectoryName(repo.Path)!, $"{repoName}.wt");
         int slot = WorktreeService.NextSlot(worktreeRoot);
 
-        var dlg = new WorktreeDialog(repo.Name, slot, BranchPrefix) { Owner = this };
+        var dlg = new WorktreeDialog(repo.Name, slot, BranchPrefix, DefaultBranch) { Owner = this };
         if (dlg.ShowDialog() != true)
             return;
 
@@ -230,7 +238,7 @@ public partial class MainWindow : Window
         ShowBusy($"Creating worktree (slot {slot})...");
         try
         {
-            result = await WorktreeService.CreateAsync(repo.Path, BranchPrefix, branchSuffix);
+            result = await WorktreeService.CreateAsync(repo.Path, BranchPrefix, branchSuffix, DefaultBranch);
         }
         finally
         {
@@ -289,7 +297,7 @@ public partial class MainWindow : Window
 
         var confirm = new ConfirmDialog(
             $"Reset worktree — {wt.DisplayName} (slot {wt.Name})",
-            "This will discard all changes and reset to origin/main.",
+            "This will discard all changes in this worktree.",
             status,
             "Reset") { Owner = this };
         if (confirm.ShowDialog() != true)
@@ -297,17 +305,40 @@ public partial class MainWindow : Window
 
         int slot = int.TryParse(wt.Name, out int n) ? n : 0;
 
-        var dlg = new WorktreeDialog(parent.Name, slot, BranchPrefix, wt.DisplayName) { Owner = this };
+        var dlg = new WorktreeDialog(parent.Name, slot, BranchPrefix, DefaultBranch, wt.DisplayName, parent.Path) { Owner = this };
         if (dlg.ShowDialog() != true)
             return;
 
-        string branchSuffix = dlg.BranchName;
-
+        // Resolve per-mode dispatch. NewBranch flows through the user-editable
+        // command template; the other two modes route through a dedicated
+        // service method that invokes `git` directly. That avoids two
+        // problems:
+        //   1. `git checkout -B <name>` fails when the branch is already
+        //      checked out in the primary worktree (the common case for
+        //      `main`). The direct path uses `--detach --force` instead.
+        //   2. Branch names from the dialog ComboBox can legally contain
+        //      cmd.exe metacharacters (|, <, >, &, %, ;, …). Routing them
+        //      through `cmd.exe /c` like the user template does would
+        //      expose us to shell injection. The direct git path passes
+        //      the ref via ArgumentList so it's never re-parsed by a shell.
         WorktreeResult result;
-        ShowBusy("Resetting worktree to origin/main...");
+        string targetRef = dlg.TargetRef;
+        string newBranch;
+        ShowBusy($"Resetting worktree to {targetRef}...");
         try
         {
-            result = await WorktreeService.ResetAsync(wt.ParentRepoPath, wt.Path, BranchPrefix, branchSuffix, WorktreeResetCommands);
+            if (dlg.Mode == WorktreeResetMode.NewBranch)
+            {
+                newBranch = BranchPrefix + dlg.BranchName;
+                result = await WorktreeService.ResetAsync(
+                    wt.ParentRepoPath, wt.Path, newBranch, targetRef, WorktreeResetCommands);
+            }
+            else
+            {
+                newBranch = dlg.BranchName;
+                result = await WorktreeService.ResetToRefAsync(
+                    wt.ParentRepoPath, wt.Path, targetRef);
+            }
         }
         finally
         {
@@ -324,20 +355,36 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Replace the node in-place so the UI updates.
+        // Replace the node in-place so the UI updates. Read the actual HEAD
+        // post-reset rather than assuming we landed on `newBranch`: the
+        // detached-checkout path for Existing/Default modes intentionally
+        // leaves the worktree on a detached HEAD, and even the New-branch
+        // path may diverge from `newBranch` if the user customized commands.
         int idx = parent.Worktrees.IndexOf(wt);
         if (idx >= 0)
         {
+            string actualBranch = GitMetadata.ReadBranch(
+                Path.Combine(parent.Path, ".git", "worktrees", wt.Name, "HEAD"));
+            // ReadBranch returns "(unknown)" (not empty) when the HEAD file
+            // is missing/unreadable — treat that as a failure to introspect
+            // and fall back to the intended local branch name.
+            if (string.IsNullOrEmpty(actualBranch) || actualBranch == "(unknown)")
+                actualBranch = newBranch;
             parent.Worktrees[idx] = new WorktreeNode
             {
                 Name = wt.Name,
                 Path = wt.Path,
-                Branch = BranchPrefix + branchSuffix,
+                Branch = actualBranch,
                 LastActivityUtc = DateTime.UtcNow,
                 ParentRepoPath = wt.ParentRepoPath,
                 BranchPrefix = BranchPrefix,
             };
         }
+
+        // Surface the reset slot in ai-frame: focus an existing window for
+        // this folder if one is open, otherwise spin up a fresh ai-frame.
+        // Mirrors the post-create flow in OnNewWorktreeClick.
+        OpenPath(wt.Path);
     }
     private async void OnDeleteWorktreeClick(object sender, RoutedEventArgs e)
     {
@@ -438,6 +485,7 @@ public partial class MainWindow : Window
         // (Change root folder) since startup.
         current.RootPath = RootPath;
         current.BranchPrefix = BranchPrefix;
+        current.DefaultBranch = DefaultBranch;
         current.DefaultAgentProvider = DefaultAgentProvider;
         current.WorktreeResetCommands = WorktreeResetCommands;
         current.ConsoleShell = ConsoleShell;
@@ -457,6 +505,7 @@ public partial class MainWindow : Window
 
         RootPath = reloaded.RootPath;
         BranchPrefix = reloaded.BranchPrefix!;
+        DefaultBranch = reloaded.DefaultBranch!;
         DefaultAgentProvider = reloaded.DefaultAgentProvider;
         WorktreeResetCommands = reloaded.WorktreeResetCommands ?? StageConfig.DefaultWorktreeResetCommands;
         ConsoleShell = reloaded.ConsoleShell;
