@@ -68,8 +68,12 @@ public partial class MainWindow : Window
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        Title = GetProjectTitle();
-        FolderPathText.Text = WorkingDirectory;
+        string projectTitle = GetProjectTitle();
+        Title = projectTitle;
+        // Center label shows the repo + branch (compact, legible); full path
+        // is in the tooltip on hover so it's still discoverable.
+        ProjectLabelText.Text = projectTitle;
+        ProjectLabelText.ToolTip = WorkingDirectory;
 
         // Resolve provider + launch command up front so the tab title can be set
         // before terminal attach. AgentCommandOverride bypasses provider lookup.

@@ -9,13 +9,27 @@ internal sealed class StageConfig
 {
     public const string DefaultBranchPrefix = "";
 
+    /// <summary>
+    /// Fallback branch name used when <see cref="DefaultBranch"/> is null/empty.
+    /// Kept as <c>"main"</c> so existing installs keep working unchanged.
+    /// </summary>
+    public const string DefaultBranchFallback = "main";
+
     /// <summary>Default reset commands run by ai-stage's "Reset worktree" action,
-    /// one per line. <c>&lt;new-branch&gt;</c> is substituted with the resolved
-    /// (prefix + suffix) branch name. Each line is executed via <c>cmd.exe /c</c>
-    /// inside the worktree directory; the first non-zero exit aborts.</summary>
+    /// one per line. Substitutions:
+    /// <list type="bullet">
+    /// <item><c>&lt;new-branch&gt;</c> — local branch name to land on (full,
+    /// prefix-included for "new branch" mode; the chosen remote branch name
+    /// for "existing"/"default" modes).</item>
+    /// <item><c>&lt;target-ref&gt;</c> — git ref to reset onto, typically
+    /// <c>origin/&lt;DefaultBranch&gt;</c> for new/default modes or
+    /// <c>origin/&lt;chosen-branch&gt;</c> for existing mode.</item>
+    /// </list>
+    /// Each line is executed via <c>cmd.exe /c</c> inside the worktree
+    /// directory; the first non-zero exit aborts.</summary>
     public const string DefaultWorktreeResetCommands =
         "git fetch\n" +
-        "git checkout -B <new-branch> origin/main\n" +
+        "git checkout -B <new-branch> <target-ref>\n" +
         "git clean -fdx";
 
     public string RootPath { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -41,6 +55,14 @@ internal sealed class StageConfig
     /// </para>
     /// </summary>
     public string? BranchPrefix { get; set; }
+
+    /// <summary>
+    /// Name of the branch ai-stage syncs new and reset worktrees to (defaults
+    /// to <c>main</c> when null/empty). Referenced as <c>origin/&lt;DefaultBranch&gt;</c>
+    /// in git operations. Used by both the "New worktree" flow and the
+    /// "New branch" / "Default branch" reset modes.
+    /// </summary>
+    public string? DefaultBranch { get; set; }
 
     /// <summary>
     /// Multi-line list of commands ai-stage runs when the user resets a
@@ -113,6 +135,7 @@ internal static class ConfigService
         }
 
         config.BranchPrefix = NormalizeBranchPrefix(config.BranchPrefix);
+        config.DefaultBranch = NormalizeDefaultBranch(config.DefaultBranch);
         return config;
     }
 
@@ -122,6 +145,17 @@ internal static class ConfigService
         if (trimmed.Length == 0)
             return "";
         return trimmed.EndsWith('/') ? trimmed : trimmed + "/";
+    }
+
+    private static string NormalizeDefaultBranch(string? value)
+    {
+        string trimmed = (value ?? "").Trim().Trim('/');
+        // Tolerate a user who typed "origin/main" — strip the redundant
+        // remote name so callers can build "origin/<DefaultBranch>" without
+        // producing "origin/origin/main".
+        if (trimmed.StartsWith("origin/", StringComparison.OrdinalIgnoreCase))
+            trimmed = trimmed["origin/".Length..].Trim('/');
+        return trimmed.Length == 0 ? StageConfig.DefaultBranchFallback : trimmed;
     }
 
     public static void Save(StageConfig config)
