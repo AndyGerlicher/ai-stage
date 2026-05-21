@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using AiStage.Services;
 
 namespace AiStage;
@@ -158,6 +159,22 @@ public partial class WorktreeDialog : Window
 
     private void OnExistingBranchChanged(object sender, SelectionChangedEventArgs e) => UpdateHint();
     private void OnExistingBranchTextChanged(object sender, KeyEventArgs e) => UpdateHint();
+
+    /// <summary>
+    /// Styles the internal editable TextBox of the ComboBox to match the dark
+    /// theme. WPF's default ComboBox template ignores Foreground/Background
+    /// for the editable portion; we must reach into the template to fix it.
+    /// </summary>
+    private void OnExistingBranchComboLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is ComboBox combo &&
+            combo.Template.FindName("PART_EditableTextBox", combo) is TextBox tb)
+        {
+            tb.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2a2a2a"));
+            tb.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8e8e8"));
+            tb.CaretBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8e8e8"));
+        }
+    }
 
     private string CurrentExistingBranch()
     {

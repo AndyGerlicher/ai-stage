@@ -127,7 +127,8 @@
                               FontFamily="Segoe UI" FontSize="13" Padding="6,4"
                               ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
                               SelectionChanged="OnExistingBranchChanged"
-                              KeyUp="OnExistingBranchTextChanged">
+                              KeyUp="OnExistingBranchTextChanged"
+                              Loaded="OnExistingBranchComboLoaded">
                         <ComboBox.Resources>
                             <!-- Dark popup background -->
                             <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#2a2a2a"/>
