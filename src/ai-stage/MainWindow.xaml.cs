@@ -336,8 +336,13 @@ public partial class MainWindow : Window
             else
             {
                 newBranch = dlg.BranchName;
+                // ExistingBranch: pass branchName so checkout creates/updates a
+                // local tracking branch. DefaultBranch: pass null to keep
+                // detached-HEAD (main is usually checked out in the primary wt).
+                string? localBranch = dlg.Mode == WorktreeResetMode.ExistingBranch
+                    ? dlg.BranchName : null;
                 result = await WorktreeService.ResetToRefAsync(
-                    wt.ParentRepoPath, wt.Path, targetRef);
+                    wt.ParentRepoPath, wt.Path, targetRef, localBranch);
             }
         }
         finally
@@ -357,9 +362,9 @@ public partial class MainWindow : Window
 
         // Replace the node in-place so the UI updates. Read the actual HEAD
         // post-reset rather than assuming we landed on `newBranch`: the
-        // detached-checkout path for Existing/Default modes intentionally
-        // leaves the worktree on a detached HEAD, and even the New-branch
-        // path may diverge from `newBranch` if the user customized commands.
+        // Default-branch mode uses a detached checkout, and even the
+        // New-branch path may diverge from `newBranch` if the user customized
+        // commands.
         int idx = parent.Worktrees.IndexOf(wt);
         if (idx >= 0)
         {
