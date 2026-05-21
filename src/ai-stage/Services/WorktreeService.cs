@@ -196,21 +196,28 @@ internal static class WorktreeService
     }
 
     /// <summary>
-    /// Performs a detached-HEAD reset of <paramref name="worktreePath"/> onto
-    /// <paramref name="targetRef"/> by invoking <c>git</c> directly (no shell).
-    /// Used by ai-stage's "Existing branch" and "Default branch" reset modes,
-    /// where the target ref comes from user-pickable data (a remote branch
-    /// name from <see cref="ListRemoteBranchesAsync"/> or an editable ComboBox)
-    /// and must therefore not be interpolated into a shell command line.
+    /// Resets <paramref name="worktreePath"/> onto <paramref name="targetRef"/>
+    /// by invoking <c>git</c> directly (no shell). Used by ai-stage's
+    /// "Existing branch" and "Default branch" reset modes, where the target
+    /// ref comes from user-pickable data (a remote branch name from
+    /// <see cref="ListRemoteBranchesAsync"/> or an editable ComboBox) and
+    /// must therefore not be interpolated into a shell command line.
+    /// <para>
+    /// When <paramref name="branchName"/> is supplied the checkout step uses
+    /// <c>git checkout &lt;branchName&gt;</c>, which creates or switches to a
+    /// local tracking branch (the "Existing branch" flow). When it is
+    /// <see langword="null"/> the checkout uses <c>--force --detach</c>
+    /// instead (the "Default branch" flow, where the branch is typically
+    /// already checked out in the primary worktree).
+    /// </para>
     /// Sequence:
     /// <list type="number">
-    /// <item><c>git fetch</c> in the main repo.</item>
-    /// <item><c>git clean -fdx</c> in the worktree — drops untracked files
-    /// that would otherwise block the checkout.</item>
-    /// <item><c>git checkout --force --detach &lt;targetRef&gt;</c>.</item>
+    /// <item><c>git fetch --prune</c> in the main repo.</item>
+    /// <item><c>git clean -fdx</c> in the worktree.</item>
+    /// <item><c>git checkout &lt;branchName&gt;</c> <em>or</em>
+    /// <c>git checkout --force --detach &lt;targetRef&gt;</c>.</item>
     /// <item><c>git reset --hard &lt;targetRef&gt;</c>.</item>
-    /// <item><c>git clean -fdx</c> again — sweeps anything the checkout
-    /// reintroduced.</item>
+    /// <item><c>git clean -fdx</c> again.</item>
     /// </list>
     /// Returns the first failing step's stderr on error.
     /// </summary>
@@ -218,6 +225,7 @@ internal static class WorktreeService
         string mainRepoPath,
         string worktreePath,
         string targetRef,
+        string? branchName = null,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(targetRef))
@@ -231,8 +239,19 @@ internal static class WorktreeService
         (ok, stderr) = await RunGitAsync(worktreePath, ["clean", "-fdx"], ct);
         if (!ok) return new WorktreeResult(false, null, $"git clean failed:\n{stderr}");
 
-        (ok, stderr) = await RunGitAsync(worktreePath, ["checkout", "--force", "--detach", targetRef], ct);
-        if (!ok) return new WorktreeResult(false, null, $"git checkout {targetRef} failed:\n{stderr}");
+        if (!string.IsNullOrWhiteSpace(branchName))
+        {
+            // Local tracking-branch checkout (Existing Branch mode).
+            (ok, stderr) = await RunGitAsync(worktreePath, ["checkout", branchName], ct);
+            if (!ok) return new WorktreeResult(false, null, $"git checkout {branchName} failed:\n{stderr}");
+        }
+        else
+        {
+            // Detached checkout (Default Branch mode — the branch is usually
+            // already checked out in the primary worktree).
+            (ok, stderr) = await RunGitAsync(worktreePath, ["checkout", "--force", "--detach", targetRef], ct);
+            if (!ok) return new WorktreeResult(false, null, $"git checkout {targetRef} failed:\n{stderr}");
+        }
 
         (ok, stderr) = await RunGitAsync(worktreePath, ["reset", "--hard", targetRef], ct);
         if (!ok) return new WorktreeResult(false, null, $"git reset --hard {targetRef} failed:\n{stderr}");
