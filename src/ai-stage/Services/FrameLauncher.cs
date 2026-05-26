@@ -76,7 +76,7 @@ internal static class FrameLauncher
     /// an agent provider id (forwarded as <c>--agent &lt;id&gt;</c>),
     /// the configured branch prefix (forwarded as <c>--branch-prefix &lt;value&gt;</c>),
     /// ai-stage's per-tab customization (Console shell + init command, agent
-    /// extra args), and the preferred editor command (forwarded as
+    /// launch commands), and the preferred editor command (forwarded as
     /// <c>--preferred-editor &lt;cmd&gt;</c>). Shows a MessageBox with install
     /// hint if launch fails.
     /// </summary>
@@ -87,7 +87,7 @@ internal static class FrameLauncher
         string? branchPrefix = null,
         string? consoleShell = null,
         string? consoleInit = null,
-        string? agentArgs = null,
+        string? agentLaunchCommands = null,
         string? preferredEditor = null)
     {
         string? frame = ResolveFrame();
@@ -106,10 +106,10 @@ internal static class FrameLauncher
             args.Add($"--console-shell \"{consoleShell}\"");
         if (!string.IsNullOrEmpty(consoleInit))
             args.Add($"--console-init \"{EscapeQuotes(consoleInit)}\"");
-        // Empty string is meaningful: "explicitly no extra args" overrides
-        // the provider's built-in default.
-        if (agentArgs is not null)
-            args.Add($"--agent-args \"{EscapeQuotes(agentArgs)}\"");
+        // Non-null value (including empty) overrides ai-frame's fallback to
+        // the provider's built-in default launch commands.
+        if (agentLaunchCommands is not null)
+            args.Add($"--agent-launch-commands \"{EscapeQuotes(agentLaunchCommands)}\"");
         if (!string.IsNullOrEmpty(preferredEditor))
             args.Add($"--preferred-editor \"{preferredEditor}\"");
         string argString = string.Join(' ', args);

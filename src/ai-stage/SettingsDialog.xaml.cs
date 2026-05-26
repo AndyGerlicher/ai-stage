@@ -12,12 +12,12 @@ public partial class SettingsDialog : Window
     private sealed record AgentChoice(string Id, string DisplayName);
     private sealed record ShellChoice(string Value, string Label);
 
-    /// <summary>One row in the per-provider CLI flags editor.</summary>
+    /// <summary>One row in the per-provider launch-commands editor.</summary>
     private sealed class AgentArgsRow
     {
         public required string ProviderId { get; init; }
         public required string DisplayName { get; init; }
-        public required string DefaultExtraArgs { get; init; }
+        public required string DefaultLaunchCommands { get; init; }
         public string Value { get; set; } = "";
     }
 
@@ -46,20 +46,19 @@ public partial class SettingsDialog : Window
 
         ConsoleInitBox.Text = current.ConsoleInitCommand ?? "";
 
-        // Build a row per registered provider for the per-agent CLI flags
-        // editor. Each row pre-fills from current.AgentArgs if the user has
-        // ever saved a value for that provider; otherwise from the provider's
-        // built-in default. We distinguish "missing key (use default)" from
-        // "explicit empty string (no extra args)" on save.
+        // Build a row per registered provider for the per-agent launch-commands
+        // editor. Each row pre-fills from current.AgentLaunchCommands if the
+        // user has ever saved a value for that provider; otherwise from the
+        // provider's built-in default.
         _agentArgsRows = new List<AgentArgsRow>();
         foreach (var p in AgentRegistry.Providers)
         {
-            string value = current.AgentArgs.TryGetValue(p.Id, out var saved) ? saved : p.DefaultExtraArgs;
+            string value = current.AgentLaunchCommands.TryGetValue(p.Id, out var saved) ? saved : p.DefaultLaunchCommands;
             _agentArgsRows.Add(new AgentArgsRow
             {
                 ProviderId = p.Id,
                 DisplayName = p.DisplayName,
-                DefaultExtraArgs = p.DefaultExtraArgs,
+                DefaultLaunchCommands = p.DefaultLaunchCommands,
                 Value = value,
             });
         }
@@ -153,18 +152,18 @@ public partial class SettingsDialog : Window
                 ? null
                 : ResetCommandsBox.Text;
 
-        // Per-provider CLI flag overrides: persist a row only when the user's
-        // value differs from the provider's default. Blank with default = ""
-        // is meaningful ("no extra args") so we still persist it.
-        var agentArgs = new Dictionary<string, string>();
+        // Per-provider launch-command overrides: persist a row only when the
+        // user's value differs from the provider's default, so future default
+        // changes naturally flow through.
+        var agentLaunchCommands = new Dictionary<string, string>();
         foreach (var row in _agentArgsRows)
         {
             // The TextBox writes back through the ItemsControl binding so
             // row.Value already reflects the latest text.
             string val = row.Value ?? "";
-            if (string.Equals(val, row.DefaultExtraArgs, StringComparison.Ordinal))
+            if (string.Equals(val, row.DefaultLaunchCommands, StringComparison.Ordinal))
                 continue; // user kept the default — don't persist, lets future default changes flow through
-            agentArgs[row.ProviderId] = val;
+            agentLaunchCommands[row.ProviderId] = val;
         }
 
         Result = new StageConfig
@@ -179,7 +178,7 @@ public partial class SettingsDialog : Window
             ConsoleShell = string.IsNullOrEmpty(selectedShell) || selectedShell == "VsDevCmd" ? null : selectedShell,
             ConsoleInitCommand = string.IsNullOrWhiteSpace(ConsoleInitBox.Text) ? null : ConsoleInitBox.Text,
             PreferredEditor = string.IsNullOrEmpty(selectedEditor) || selectedEditor == "code-insiders" ? null : selectedEditor,
-            AgentArgs = agentArgs,
+            AgentLaunchCommands = agentLaunchCommands,
         };
 
         DialogResult = true;

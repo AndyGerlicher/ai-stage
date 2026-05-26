@@ -14,27 +14,30 @@ public interface IAgentProvider
     string DisplayName { get; }
 
     /// <summary>
-    /// The provider's recommended default flags appended to its CLI invocation
-    /// when the host doesn't override (e.g. <c>"--allow-all-tools"</c> for
-    /// GitHub Copilot, <c>"--dangerously-skip-permissions"</c> for Claude).
-    /// Used by the settings UI to pre-fill defaults and by
-    /// <see cref="GetLaunchCommand"/> when <c>extraArgs</c> is null.
+    /// The provider's default multi-line launch script — what the agent tab
+    /// runs when the user hasn't customized it. One command per line; blank
+    /// lines and <c>#</c> comments are ignored. The last non-empty line is
+    /// the persistent interactive process (e.g. <c>"copilot --allow-all-tools"</c>
+    /// for GitHub Copilot, <c>"claude"</c> for Claude Code).
     /// </summary>
-    string DefaultExtraArgs { get; }
+    string DefaultLaunchCommands { get; }
 
     /// <summary>
     /// Returns the full shell command line ai-frame should run inside its
-    /// terminal to start the agent CLI in interactive mode. Providers own
-    /// their own quoting and are responsible for handling the optional
-    /// <paramref name="initialPromptFile"/> (typically a UTF-8 text file the
-    /// host wants the agent to consume on startup).
+    /// terminal to start the agent CLI in interactive mode.
     ///
-    /// <para><paramref name="extraArgs"/> is an optional, host-supplied
-    /// argument string the provider should append to its CLI invocation.
-    /// When null, providers fall back to <see cref="DefaultExtraArgs"/>;
-    /// an explicit empty string means "no extra args".</para>
+    /// <para><paramref name="commands"/> is the multi-line launch script
+    /// (one command per line). Non-empty / non-comment lines are chained with
+    /// <c>&amp;&amp;</c> so a failing earlier line short-circuits the chain;
+    /// the last line is the persistent interactive process.</para>
+    ///
+    /// <para>When <paramref name="initialPromptFile"/> is non-null and exists,
+    /// the provider wraps only the final command in a shim that reads the
+    /// prompt file, deletes it, and forwards the text to the agent in the
+    /// provider-appropriate form (e.g. <c>-i</c> for Copilot, positional for
+    /// Claude). Earlier commands run unmodified.</para>
     /// </summary>
-    string GetLaunchCommand(string? initialPromptFile, string? extraArgs = null);
+    string BuildLaunchCommand(string? initialPromptFile, string commands);
 
     /// <summary>
     /// Creates a new session store for this provider. The caller owns the

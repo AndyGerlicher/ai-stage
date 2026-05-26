@@ -95,17 +95,30 @@ internal sealed class StageConfig
     public string? PreferredEditor { get; set; }
 
     /// <summary>
-    /// Per-provider CLI argument overrides, keyed by <see cref="IAgentProvider.Id"/>.
-    /// Each value is the extra args ai-frame appends to that provider's
-    /// invocation (e.g. <c>"--allow-all-tools"</c> for github-copilot).
+    /// Per-provider launch-command scripts, keyed by <see cref="IAgentProvider.Id"/>.
+    /// Each value is a multi-line script (one command per line; blank lines
+    /// and <c>#</c> comments are ignored) that ai-frame runs in the agent
+    /// terminal. Non-empty lines are chained with <c>&amp;&amp;</c> in order
+    /// — the last line is the persistent interactive agent process; earlier
+    /// lines (e.g. <c>copilot update</c>) run first and short-circuit on
+    /// non-zero exit (cmd.exe semantics, matching worktree-reset).
     /// <para>
     /// Lookup semantics: <b>missing key</b> means "use the provider's
-    /// <see cref="IAgentProvider.DefaultExtraArgs"/>"; an <b>explicit empty
-    /// string</b> means "pass nothing extra" so users can opt out of the
-    /// default flags entirely.
+    /// <see cref="IAgentProvider.DefaultLaunchCommands"/>"; a non-null value
+    /// always replaces the default in full.
     /// </para>
     /// </summary>
-    public Dictionary<string, string> AgentArgs { get; set; } = new();
+    public Dictionary<string, string> AgentLaunchCommands { get; set; } = new();
+
+    /// <summary>
+    /// Legacy per-provider CLI argument overrides (pre-launch-commands).
+    /// Read by <see cref="ConfigService.Load"/> and migrated into
+    /// <see cref="AgentLaunchCommands"/> on first load, then dropped on the
+    /// next save. Kept on the type so existing JSON deserializes cleanly;
+    /// new code should always use <see cref="AgentLaunchCommands"/>.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("AgentArgs")]
+    public Dictionary<string, string>? LegacyAgentArgs { get; set; }
 }
 
 internal static class ConfigService
@@ -136,7 +149,49 @@ internal static class ConfigService
 
         config.BranchPrefix = NormalizeBranchPrefix(config.BranchPrefix);
         config.DefaultBranch = NormalizeDefaultBranch(config.DefaultBranch);
+        MigrateLegacyAgentArgs(config);
         return config;
+    }
+
+    /// <summary>
+    /// One-shot migration: translate any legacy <c>AgentArgs</c> entries into
+    /// <see cref="StageConfig.AgentLaunchCommands"/> by reconstructing the
+    /// historical command shape (<c>copilot &lt;args&gt;</c> / <c>claude
+    /// &lt;args&gt;</c>) for known provider ids. Unknown ids are passed
+    /// through verbatim as bare args (best-effort, no data loss).
+    /// New entries in <c>AgentLaunchCommands</c> always win — we only fill
+    /// in keys the user hasn't already set via the new schema.
+    /// After migration the legacy field is cleared so the next
+    /// <see cref="Save"/> drops it from disk.
+    /// </summary>
+    private static void MigrateLegacyAgentArgs(StageConfig config)
+    {
+        // Guard against malformed JSON that explicitly sets AgentLaunchCommands
+        // to null (deserializer won't apply the property initializer in that case).
+        config.AgentLaunchCommands ??= new Dictionary<string, string>();
+
+        if (config.LegacyAgentArgs is null)
+            return;
+
+        foreach (var (id, args) in config.LegacyAgentArgs)
+        {
+            if (config.AgentLaunchCommands.ContainsKey(id))
+                continue; // user already set the new field for this provider
+
+            string baseCmd = id switch
+            {
+                "github-copilot" => "copilot",
+                "claude-code" => "claude",
+                _ => id, // unknown — preserve whatever the user had
+            };
+
+            string trimmed = (args ?? "").Trim();
+            config.AgentLaunchCommands[id] = trimmed.Length == 0 ? baseCmd : $"{baseCmd} {trimmed}";
+        }
+
+        // Always clear so the legacy "AgentArgs" key drops out of the next
+        // save, whether it had entries or was just an empty dict left over.
+        config.LegacyAgentArgs = null;
     }
 
     private static string NormalizeBranchPrefix(string? value)
@@ -164,7 +219,14 @@ internal static class ConfigService
         {
             string dir = Path.GetDirectoryName(StorePath)!;
             Directory.CreateDirectory(dir);
-            File.WriteAllText(StorePath, JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+            var opts = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                // Drop the legacy AgentArgs key (and any other null-valued
+                // properties) from the on-disk JSON once migration has run.
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+            };
+            File.WriteAllText(StorePath, JsonSerializer.Serialize(config, opts));
         }
         catch
         {

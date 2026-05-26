@@ -330,8 +330,8 @@
                 <ComboBox x:Name="AgentCombo" Style="{StaticResource DarkComboBoxStyle}"
                           DisplayMemberPath="DisplayName" SelectedValuePath="Id"/>
 
-                <TextBlock Text="CLI flags" Style="{StaticResource LabelStyle}" Margin="0,12,0,0"/>
-                <TextBlock Text="Per-agent extra arguments. Leave a row blank to pass nothing; clear and re-fill to reset to the agent's default."
+                <TextBlock Text="Launch commands" Style="{StaticResource LabelStyle}" Margin="0,12,0,0"/>
+                <TextBlock Text="Per-agent command lines run in the agent terminal, one per line. Chained with cmd-style &amp;&amp; (first non-zero exit aborts); the last line is the persistent interactive agent process. Lines starting with # are ignored."
                            Style="{StaticResource HintStyle}"/>
                 <ItemsControl x:Name="AgentArgsList">
                     <ItemsControl.ItemTemplate>
@@ -343,10 +343,13 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="{Binding DisplayName}"
                                            Foreground="#cfcfcf" FontSize="12" FontFamily="Segoe UI"
-                                           VerticalAlignment="Center"/>
+                                           VerticalAlignment="Top" Margin="0,6,0,0"/>
                                 <TextBox Grid.Column="1"
                                          Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
-                                         Style="{StaticResource MonoTextBoxStyle}"/>
+                                         Style="{StaticResource MonoTextBoxStyle}"
+                                         Height="72" AcceptsReturn="True" TextWrapping="NoWrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         HorizontalScrollBarVisibility="Auto"/>
                             </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

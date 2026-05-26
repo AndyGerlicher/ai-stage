@@ -85,8 +85,8 @@ internal static class FrameWindowActivator
     /// Treats any token starting with <c>--</c> as a flag that consumes the
     /// next token as its value — same shape every flag in
     /// <c>App.xaml.cs</c> uses, so values that themselves start with
-    /// <c>--</c> (e.g. <c>--agent-args --allow-all-tools</c>) round-trip
-    /// correctly.
+    /// <c>--</c> (e.g. <c>--agent-launch-commands "copilot --allow-all-tools"</c>)
+    /// round-trip correctly.
     /// </summary>
     private static bool FolderArgMatches(int pid, string targetNormalized)
     {
