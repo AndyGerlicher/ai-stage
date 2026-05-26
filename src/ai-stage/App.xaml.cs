@@ -52,7 +52,7 @@ public partial class App : Application
             ConsoleShell = config.ConsoleShell,
             ConsoleInitCommand = config.ConsoleInitCommand,
             PreferredEditor = config.PreferredEditor,
-            AgentArgs = config.AgentArgs ?? new System.Collections.Generic.Dictionary<string, string>(),
+            AgentLaunchCommands = config.AgentLaunchCommands ?? new System.Collections.Generic.Dictionary<string, string>(),
         };
         MainWindow = window;
         window.Show();

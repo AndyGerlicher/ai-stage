@@ -32,9 +32,10 @@ public partial class MainWindow : Window
     /// <summary>Optional tab title override; falls back to the resolved provider's DisplayName.</summary>
     public string? AgentTitleOverride { get; set; }
 
-    /// <summary>Extra arguments to forward to the agent CLI. Set by ai-stage via
-    /// <c>--agent-args</c>; null = let the provider use its built-in default.</summary>
-    public string? AgentArgs { get; set; }
+    /// <summary>Multi-line launch script forwarded to the resolved agent
+    /// provider. Set by ai-stage via <c>--agent-launch-commands</c>; null =
+    /// let the provider use its built-in <c>DefaultLaunchCommands</c>.</summary>
+    public string? AgentLaunchCommands { get; set; }
 
     /// <summary>Console tab shell; default <see cref="Services.ConsoleShell.VsDevCmd"/>.</summary>
     public Services.ConsoleShell ConsoleShell { get; set; } = Services.ConsoleShell.VsDevCmd;
@@ -98,7 +99,8 @@ public partial class MainWindow : Window
                         $"Registered: {string.Join(", ", AgentRegistry.Providers.Select(p => p.Id))}");
             }
             AgentDisplayName = AgentTitleOverride ?? provider.DisplayName;
-            command = provider.GetLaunchCommand(InitialPromptFile, AgentArgs);
+            string commands = AgentLaunchCommands ?? provider.DefaultLaunchCommands;
+            command = provider.BuildLaunchCommand(InitialPromptFile, commands);
         }
         CopilotTabButton.Content = "★ " + AgentDisplayName;
 

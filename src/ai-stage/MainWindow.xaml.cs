@@ -57,8 +57,8 @@ public partial class MainWindow : Window
     /// forwarded to ai-frame; null = ai-frame's built-in default.</summary>
     public string? PreferredEditor { get; set; }
 
-    /// <summary>Per-provider CLI argument overrides; missing key = use provider default.</summary>
-    public Dictionary<string, string> AgentArgs { get; set; } = new();
+    /// <summary>Per-provider launch-command scripts; missing key = use provider default.</summary>
+    public Dictionary<string, string> AgentLaunchCommands { get; set; } = new();
 
     private readonly ObservableCollection<RepoNode> _repos = new();
     private readonly RepoFilter _filter = new();
@@ -201,13 +201,17 @@ public partial class MainWindow : Window
         // > null (let ai-frame pick its own default).
         string? agentId = session?.ProviderId ?? DefaultAgentProvider;
 
-        // Look up the matching extra-args override, if any. AgentArgs uses
-        // missing-key = "use provider default", explicit empty string =
-        // "no extra args"; FrameLauncher.Launch preserves both via the
-        // null vs. "" distinction on its agentArgs parameter.
-        string? agentArgs = null;
-        if (agentId is not null && AgentArgs.TryGetValue(agentId, out var configured))
-            agentArgs = configured;
+        // Look up the matching launch-commands override, if any.
+        // AgentLaunchCommands uses missing-key = "use provider default";
+        // FrameLauncher.Launch forwards null = "default" and any non-null
+        // value (including the empty string) verbatim via --agent-launch-commands.
+        // When the user left agentId as null ("use ai-frame default"), we
+        // still want their per-provider overrides to apply, so look up under
+        // the registry's default id in that case.
+        string lookupAgentId = agentId ?? AgentRegistry.Default.Id;
+        string? agentLaunchCommands = null;
+        if (AgentLaunchCommands.TryGetValue(lookupAgentId, out var configured))
+            agentLaunchCommands = configured;
 
         FrameLauncher.Launch(
             path,
@@ -215,7 +219,7 @@ public partial class MainWindow : Window
             branchPrefix: BranchPrefix,
             consoleShell: ConsoleShell,
             consoleInit: ConsoleInitCommand,
-            agentArgs: agentArgs,
+            agentLaunchCommands: agentLaunchCommands,
             preferredEditor: PreferredEditor);
     }
 
@@ -267,11 +271,13 @@ public partial class MainWindow : Window
         });
 
         // For brand-new worktrees no live session can exist yet, so the agent
-        // is determined entirely by the configured default. Look up its
-        // matching extra-args override the same way OpenPath does.
-        string? newAgentArgs = null;
-        if (DefaultAgentProvider is not null && AgentArgs.TryGetValue(DefaultAgentProvider, out var configured))
-            newAgentArgs = configured;
+        // is determined entirely by the configured default. When DefaultAgentProvider
+        // is null ("use ai-frame default"), fall through to the registry default
+        // so per-provider overrides still apply.
+        string lookupAgentId = DefaultAgentProvider ?? AgentRegistry.Default.Id;
+        string? newAgentLaunchCommands = null;
+        if (AgentLaunchCommands.TryGetValue(lookupAgentId, out var configured))
+            newAgentLaunchCommands = configured;
 
         FrameLauncher.Launch(
             result.Path,
@@ -279,7 +285,7 @@ public partial class MainWindow : Window
             branchPrefix: BranchPrefix,
             consoleShell: ConsoleShell,
             consoleInit: ConsoleInitCommand,
-            agentArgs: newAgentArgs,
+            agentLaunchCommands: newAgentLaunchCommands,
             preferredEditor: PreferredEditor);
     }
 
@@ -495,7 +501,7 @@ public partial class MainWindow : Window
         current.WorktreeResetCommands = WorktreeResetCommands;
         current.ConsoleShell = ConsoleShell;
         current.ConsoleInitCommand = ConsoleInitCommand;
-        current.AgentArgs = AgentArgs;
+        current.AgentLaunchCommands = AgentLaunchCommands;
 
         var dlg = new SettingsDialog(current) { Owner = this };
         if (dlg.ShowDialog() != true || dlg.Result is null) return;
@@ -515,7 +521,7 @@ public partial class MainWindow : Window
         WorktreeResetCommands = reloaded.WorktreeResetCommands ?? StageConfig.DefaultWorktreeResetCommands;
         ConsoleShell = reloaded.ConsoleShell;
         ConsoleInitCommand = reloaded.ConsoleInitCommand;
-        AgentArgs = reloaded.AgentArgs ?? new Dictionary<string, string>();
+        AgentLaunchCommands = reloaded.AgentLaunchCommands ?? new Dictionary<string, string>();
 
         if (rootChanged)
             await RefreshAsync();

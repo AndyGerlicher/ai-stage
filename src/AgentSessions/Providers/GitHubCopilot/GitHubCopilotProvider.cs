@@ -1,4 +1,5 @@
 using System.IO;
+using AgentSessions.Internal;
 
 namespace AgentSessions.Providers.GitHubCopilot;
 
@@ -9,32 +10,37 @@ public sealed class GitHubCopilotProvider : IAgentProvider
 {
     public const string ProviderId = "github-copilot";
 
-    /// <summary>Default arguments appended after <c>copilot</c> when the host
-    /// doesn't specify <paramref name="extraArgs"/>.</summary>
-    public const string CopilotDefaultExtraArgs = "--allow-all-tools";
+    /// <summary>Default launch script when the user hasn't customized it.</summary>
+    public const string CopilotDefaultLaunchCommands = "copilot --allow-all-tools";
 
     public string Id => ProviderId;
     public string DisplayName => "Copilot";
-    public string DefaultExtraArgs => CopilotDefaultExtraArgs;
+    public string DefaultLaunchCommands => CopilotDefaultLaunchCommands;
 
     /// <summary>
-    /// Returns the command ai-frame should run to start the GitHub Copilot CLI.
-    /// When <paramref name="initialPromptFile"/> is supplied and exists, the
-    /// command is wrapped in a PowerShell shim that reads the prompt and
-    /// passes it via <c>-i</c>, deleting the file afterwards so each prompt
-    /// is consumed exactly once.
+    /// Builds the command ai-frame runs in the agent terminal.
+    /// Non-empty / non-<c>#</c>-comment lines from <paramref name="commands"/>
+    /// are chained with <c>&amp;&amp;</c> in order; the last line is the
+    /// persistent interactive Copilot process.
     /// <para>
-    /// <paramref name="extraArgs"/> overrides <see cref="CopilotDefaultExtraArgs"/>;
-    /// pass empty string to drop the default flags entirely.
+    /// When <paramref name="initialPromptFile"/> is supplied and exists, the
+    /// final line is wrapped in a PowerShell shim that reads the prompt and
+    /// passes it via <c>-i</c>, deleting the file afterwards so each prompt
+    /// is consumed exactly once. Earlier lines (e.g. <c>copilot update</c>)
+    /// run unmodified.
     /// </para>
     /// </summary>
-    public string GetLaunchCommand(string? initialPromptFile, string? extraArgs = null)
+    public string BuildLaunchCommand(string? initialPromptFile, string commands)
     {
-        string args = extraArgs ?? CopilotDefaultExtraArgs;
-        string baseCmd = string.IsNullOrEmpty(args) ? "copilot" : $"copilot {args}";
+        var lines = LaunchCommandComposer.ParseLines(commands);
+        if (lines.Count == 0)
+            return "";
 
         if (string.IsNullOrEmpty(initialPromptFile) || !File.Exists(initialPromptFile))
-            return baseCmd;
+            return LaunchCommandComposer.Chain(lines);
+
+        string preamble = LaunchCommandComposer.ChainPreamble(lines);
+        string finalCmd = lines[^1];
 
         // PowerShell single-quote string escape: '' escapes a single quote.
         string escapedPath = initialPromptFile.Replace("'", "''");
@@ -42,9 +48,9 @@ public sealed class GitHubCopilotProvider : IAgentProvider
         string psCommand =
             $"$p = Get-Content -Raw -LiteralPath '{escapedPath}'; " +
             $"Remove-Item -LiteralPath '{escapedPath}' -ErrorAction SilentlyContinue; " +
-            $"{baseCmd} -i $p";
+            $"{finalCmd} -i $p";
 
-        return $"powershell -NoProfile -ExecutionPolicy Bypass -Command \"{psCommand}\"";
+        return preamble + $"powershell -NoProfile -ExecutionPolicy Bypass -Command \"{psCommand}\"";
     }
 
     public IAgentSessionStore CreateSessionStore() => new GitHubCopilotSessionMonitor();

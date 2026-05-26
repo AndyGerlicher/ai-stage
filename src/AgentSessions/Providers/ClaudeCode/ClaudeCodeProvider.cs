@@ -1,4 +1,5 @@
 using System.IO;
+using AgentSessions.Internal;
 
 namespace AgentSessions.Providers.ClaudeCode;
 
@@ -9,34 +10,40 @@ public sealed class ClaudeCodeProvider : IAgentProvider
 {
     public const string ProviderId = "claude-code";
 
-    /// <summary>Default arguments appended after <c>claude</c> when the host
-    /// doesn't specify <paramref name="extraArgs"/>. 'Auto Mode' (set and remembered in Claude)
-    /// is Claude Code's equivalent of GitHub Copilot's <c>--allow-all-tools</c>:
-    /// it suppresses the per-tool permission prompts.</summary>
-    public const string ClaudeDefaultExtraArgs = "";
+    /// <summary>Default launch script when the user hasn't customized it.
+    /// 'Auto Mode' (set and remembered in Claude) is Claude Code's equivalent
+    /// of GitHub Copilot's <c>--allow-all-tools</c>: it suppresses the
+    /// per-tool permission prompts, so no flag is needed here.</summary>
+    public const string ClaudeDefaultLaunchCommands = "claude";
 
     public string Id => ProviderId;
     public string DisplayName => "Claude Code";
-    public string DefaultExtraArgs => ClaudeDefaultExtraArgs;
+    public string DefaultLaunchCommands => ClaudeDefaultLaunchCommands;
 
     /// <summary>
-    /// Returns the command ai-frame should run to start the Claude Code CLI.
-    /// When <paramref name="initialPromptFile"/> is supplied and exists, the
-    /// command is wrapped in a PowerShell shim that reads the prompt and
-    /// passes it as Claude's positional initial-message argument, deleting
-    /// the file afterwards so each prompt is consumed exactly once.
+    /// Builds the command ai-frame runs in the agent terminal.
+    /// Non-empty / non-<c>#</c>-comment lines from <paramref name="commands"/>
+    /// are chained with <c>&amp;&amp;</c> in order; the last line is the
+    /// persistent interactive Claude process.
     /// <para>
-    /// <paramref name="extraArgs"/> overrides <see cref="ClaudeDefaultExtraArgs"/>;
-    /// pass empty string to drop the default flags entirely.
+    /// When <paramref name="initialPromptFile"/> is supplied and exists, the
+    /// final line is wrapped in a PowerShell shim that reads the prompt and
+    /// passes it as Claude's positional initial-message argument, deleting
+    /// the file afterwards so each prompt is consumed exactly once. Earlier
+    /// lines run unmodified.
     /// </para>
     /// </summary>
-    public string GetLaunchCommand(string? initialPromptFile, string? extraArgs = null)
+    public string BuildLaunchCommand(string? initialPromptFile, string commands)
     {
-        string args = extraArgs ?? ClaudeDefaultExtraArgs;
-        string baseCmd = string.IsNullOrEmpty(args) ? "claude" : $"claude {args}";
+        var lines = LaunchCommandComposer.ParseLines(commands);
+        if (lines.Count == 0)
+            return "";
 
         if (string.IsNullOrEmpty(initialPromptFile) || !File.Exists(initialPromptFile))
-            return baseCmd;
+            return LaunchCommandComposer.Chain(lines);
+
+        string preamble = LaunchCommandComposer.ChainPreamble(lines);
+        string finalCmd = lines[^1];
 
         // PowerShell single-quote string escape: '' escapes a single quote.
         string escapedPath = initialPromptFile.Replace("'", "''");
@@ -44,9 +51,9 @@ public sealed class ClaudeCodeProvider : IAgentProvider
         string psCommand =
             $"$p = Get-Content -Raw -LiteralPath '{escapedPath}'; " +
             $"Remove-Item -LiteralPath '{escapedPath}' -ErrorAction SilentlyContinue; " +
-            $"{baseCmd} $p";
+            $"{finalCmd} $p";
 
-        return $"pwsh -NoProfile -ExecutionPolicy Bypass -Command \"{psCommand}\"";
+        return preamble + $"pwsh -NoProfile -ExecutionPolicy Bypass -Command \"{psCommand}\"";
     }
 
     public IAgentSessionStore CreateSessionStore() => new ClaudeCodeSessionMonitor();

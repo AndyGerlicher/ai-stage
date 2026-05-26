@@ -19,7 +19,7 @@ public partial class App : Application
         string? agentId = null;
         string? agentCommandOverride = null;
         string? agentTitleOverride = null;
-        string? agentArgs = null;
+        string? agentLaunchCommands = null;
         string? branchPrefix = null;
         string? consoleShellRaw = null;
         string? consoleInit = null;
@@ -30,7 +30,8 @@ public partial class App : Application
         // --agent <id>                     pick a registered agent provider (default: github-copilot)
         // --agent-command "<cmd>"          escape hatch: run a raw command, no provider lookup
         // --agent-title "<title>"          tab title override (used with --agent-command)
-        // --agent-args "<args>"            extra arguments forwarded to the agent CLI (e.g. --allow-all-tools)
+        // --agent-launch-commands "<lines>" multi-line launch script forwarded to the agent provider
+        //                                  (overrides the provider's DefaultLaunchCommands)
         // --branch-prefix <value>          override the branch prefix stripped from the window title
         // --console-shell <kind>           Console tab shell: VsDevCmd | PowerShell | Cmd
         // --console-init "<line>"          command to run in the Console tab after shell init
@@ -62,10 +63,10 @@ public partial class App : Application
                 agentTitleOverride = e.Args[++i];
                 continue;
             }
-            if (string.Equals(arg, "--agent-args", StringComparison.OrdinalIgnoreCase)
+            if (string.Equals(arg, "--agent-launch-commands", StringComparison.OrdinalIgnoreCase)
                 && i + 1 < e.Args.Length)
             {
-                agentArgs = e.Args[++i];
+                agentLaunchCommands = e.Args[++i];
                 continue;
             }
             if (string.Equals(arg, "--branch-prefix", StringComparison.OrdinalIgnoreCase)
@@ -157,7 +158,7 @@ public partial class App : Application
             AgentId = agentId,
             AgentCommandOverride = agentCommandOverride,
             AgentTitleOverride = agentTitleOverride,
-            AgentArgs = agentArgs,
+            AgentLaunchCommands = agentLaunchCommands,
             ConsoleInitCommand = consoleInit,
         };
         if (!string.IsNullOrEmpty(preferredEditor))
