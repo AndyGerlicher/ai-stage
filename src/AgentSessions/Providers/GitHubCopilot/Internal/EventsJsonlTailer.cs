@@ -24,6 +24,7 @@ internal sealed class EventsJsonlTailer
 
     private int _openTools;
     private int _openAssistantMessages;
+    private int _openAssistantTurns;
     private int _openHooks;
 
     public EventsJsonlTailer(string path)
@@ -32,7 +33,7 @@ internal sealed class EventsJsonlTailer
     }
 
     /// <summary>Whether any open operation was observed at the last poll.</summary>
-    public bool IsProcessing => _openTools > 0 || _openAssistantMessages > 0 || _openHooks > 0;
+    public bool IsProcessing => _openTools > 0 || _openAssistantMessages > 0 || _openAssistantTurns > 0 || _openHooks > 0;
 
     /// <summary>
     /// Reads any new bytes appended since the previous poll and updates the
@@ -96,6 +97,7 @@ internal sealed class EventsJsonlTailer
         _carry = Array.Empty<byte>();
         _openTools = 0;
         _openAssistantMessages = 0;
+        _openAssistantTurns = 0;
         _openHooks = 0;
     }
 
@@ -173,6 +175,12 @@ internal sealed class EventsJsonlTailer
                     break;
                 case "assistant.message_complete":
                     if (_openAssistantMessages > 0) _openAssistantMessages--;
+                    break;
+                case "assistant.turn_start":
+                    _openAssistantTurns++;
+                    break;
+                case "assistant.turn_end":
+                    if (_openAssistantTurns > 0) _openAssistantTurns--;
                     break;
                 case "hook.start":
                     _openHooks++;
