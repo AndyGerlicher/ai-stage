@@ -232,17 +232,28 @@ public partial class MainWindow : Window
         string worktreeRoot = Path.Combine(Path.GetDirectoryName(repo.Path)!, $"{repoName}.wt");
         int slot = WorktreeService.NextSlot(worktreeRoot);
 
-        var dlg = new WorktreeDialog(repo.Name, slot, BranchPrefix, DefaultBranch) { Owner = this };
+        var dlg = new WorktreeDialog(repo.Name, slot, BranchPrefix, DefaultBranch, repo.Path) { Owner = this };
         if (dlg.ShowDialog() != true)
             return;
-
-        string branchSuffix = dlg.BranchName;
 
         WorktreeResult result;
         ShowBusy($"Creating worktree (slot {slot})...");
         try
         {
-            result = await WorktreeService.CreateAsync(repo.Path, BranchPrefix, branchSuffix, DefaultBranch);
+            if (dlg.Mode == WorktreeResetMode.NewBranch)
+            {
+                result = await WorktreeService.CreateAsync(repo.Path, BranchPrefix, dlg.BranchName, DefaultBranch);
+            }
+            else
+            {
+                // Existing-branch creates/checks out a local branch of that
+                // name; default-branch lands detached (it's usually already
+                // checked out in the primary worktree). CreateFromRefAsync
+                // falls back to detached if the branch is checked out elsewhere.
+                string? localBranch = dlg.Mode == WorktreeResetMode.ExistingBranch
+                    ? dlg.BranchName : null;
+                result = await WorktreeService.CreateFromRefAsync(repo.Path, dlg.TargetRef, localBranch);
+            }
         }
         finally
         {

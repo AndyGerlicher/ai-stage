@@ -35,7 +35,7 @@ public partial class WorktreeDialog : Window
     /// </summary>
     public string BranchName { get; private set; } = "";
 
-    /// <summary>Selected reset mode (always <see cref="WorktreeResetMode.NewBranch"/> in create mode).</summary>
+    /// <summary>Selected target mode. Both create and reset flows offer all three.</summary>
     public WorktreeResetMode Mode { get; private set; } = WorktreeResetMode.NewBranch;
 
     /// <summary>Git ref to reset onto (e.g. <c>origin/main</c>). Always <c>origin/&lt;something&gt;</c>.</summary>
@@ -49,8 +49,8 @@ public partial class WorktreeDialog : Window
     private readonly string? _repoPath;
     private bool _remoteBranchesLoaded;
 
-    /// <summary>Create mode — auto-numbered slot, user picks branch name.</summary>
-    public WorktreeDialog(string repoName, int slot, string branchPrefix, string defaultBranch)
+    /// <summary>Create mode — auto-numbered slot, user picks one of three branch targets.</summary>
+    public WorktreeDialog(string repoName, int slot, string branchPrefix, string defaultBranch, string mainRepoPath)
     {
         InitializeComponent();
         AiStage.Native.WindowEffects.EnableThinBorder(this);
@@ -60,12 +60,13 @@ public partial class WorktreeDialog : Window
         _branchPrefix = branchPrefix;
         _defaultBranch = string.IsNullOrWhiteSpace(defaultBranch)
             ? StageConfig.DefaultBranchFallback : defaultBranch;
-        _repoPath = null;
+        _repoPath = mainRepoPath;
         TitleText.Text = $"New worktree — {repoName}";
         CreateButton.Content = "Create";
-        // Create flow only supports the "new branch" path; hide the mode
-        // picker entirely so the dialog looks like the old single-input one.
-        ModePanel.Visibility = Visibility.Collapsed;
+        DefaultBranchText.Text = _defaultBranch;
+        // Create flow offers all three targets (new branch / existing remote
+        // branch / default branch), just like reset, defaulting to a new branch.
+        ModePanel.Visibility = Visibility.Visible;
         NameBox.TextChanged += (_, _) => UpdateHint();
         UpdateHint();
         Loaded += (_, _) => NameBox.Focus();
@@ -161,18 +162,19 @@ public partial class WorktreeDialog : Window
     private void OnExistingBranchTextChanged(object sender, KeyEventArgs e) => UpdateHint();
 
     /// <summary>
-    /// Styles the internal editable TextBox of the ComboBox to match the dark
-    /// theme. WPF's default ComboBox template ignores Foreground/Background
-    /// for the editable portion; we must reach into the template to fix it.
+    /// Colors the internal editable TextBox of the ComboBox. WPF renders the
+    /// editable portion on white chrome the dark theme can't recolor, so we
+    /// give it black text on a white background for legibility; the dropdown
+    /// list keeps the dark styling.
     /// </summary>
     private void OnExistingBranchComboLoaded(object sender, RoutedEventArgs e)
     {
         if (sender is ComboBox combo &&
             combo.Template.FindName("PART_EditableTextBox", combo) is TextBox tb)
         {
-            tb.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2a2a2a"));
-            tb.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8e8e8"));
-            tb.CaretBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8e8e8"));
+            tb.Background = new SolidColorBrush(Colors.White);
+            tb.Foreground = new SolidColorBrush(Colors.Black);
+            tb.CaretBrush = new SolidColorBrush(Colors.Black);
         }
     }
 
@@ -187,8 +189,9 @@ public partial class WorktreeDialog : Window
     {
         if (PathHintText is null) return;
 
-        // Pick the active mode (create flow is always NewBranch).
-        WorktreeResetMode mode = !_isReset || ModeNewBranchRadio?.IsChecked == true
+        // Pick the active mode from the radios (the picker is shown in both
+        // create and reset flows; New branch is the default selection).
+        WorktreeResetMode mode = ModeNewBranchRadio?.IsChecked == true
             ? WorktreeResetMode.NewBranch
             : ModeExistingBranchRadio?.IsChecked == true
                 ? WorktreeResetMode.ExistingBranch
@@ -209,21 +212,25 @@ public partial class WorktreeDialog : Window
             {
                 string sel = CurrentExistingBranch();
                 string display = string.IsNullOrEmpty(sel) ? "<pick a branch>" : sel;
-                PathHintText.Text = $"Checkout: {display}  —  resets to origin/{display}";
+                PathHintText.Text = _isReset
+                    ? $"Checkout: {display}  —  resets to origin/{display}"
+                    : $"…\\{_repoName}.wt\\{_slot}  →  checkout {display}  (origin/{display})";
                 break;
             }
             case WorktreeResetMode.DefaultBranch:
-                PathHintText.Text = $"Checkout: {_defaultBranch}  —  resets to origin/{_defaultBranch}";
+                PathHintText.Text = _isReset
+                    ? $"Checkout: {_defaultBranch}  —  resets to origin/{_defaultBranch}"
+                    : $"…\\{_repoName}.wt\\{_slot}  →  checkout {_defaultBranch}  (origin/{_defaultBranch})";
                 break;
         }
     }
 
     private void OnCreateClick(object sender, RoutedEventArgs e)
     {
-        // Resolve mode + branch + target ref into the public properties so
-        // the caller can drive WorktreeService.ResetAsync without needing to
-        // know about the dialog's controls.
-        WorktreeResetMode mode = !_isReset || ModeNewBranchRadio.IsChecked == true
+        // Resolve mode + branch + target ref into the public properties so the
+        // caller can drive the create/reset services without needing to know
+        // about the dialog's controls.
+        WorktreeResetMode mode = ModeNewBranchRadio.IsChecked == true
             ? WorktreeResetMode.NewBranch
             : ModeExistingBranchRadio.IsChecked == true
                 ? WorktreeResetMode.ExistingBranch
