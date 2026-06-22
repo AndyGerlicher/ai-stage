@@ -106,7 +106,7 @@ public partial class MainWindow : Window
         };
     }
 
-    private async Task RefreshAsync()
+    private async Task RefreshAsync(string? pinRepoPath = null)
     {
         Title = $"ai-stage — {RootPath}";
         RootPathText.Text = RootPath;
@@ -130,6 +130,17 @@ public partial class MainWindow : Window
 
         ScanningText.Visibility = Visibility.Collapsed;
 
+        // When a freshly cloned repo is requested, surface it at the very top
+        // regardless of its last-activity sort position so the user can act on
+        // it immediately.
+        if (pinRepoPath is not null)
+        {
+            var pinned = found.FirstOrDefault(r =>
+                string.Equals(r.Path, pinRepoPath, StringComparison.OrdinalIgnoreCase));
+            if (pinned is not null)
+                found = found.Where(r => !ReferenceEquals(r, pinned)).Prepend(pinned).ToList();
+        }
+
         foreach (var r in found)
         {
             r.Filter = _filter;
@@ -146,6 +157,29 @@ public partial class MainWindow : Window
                 : $"Root folder not found: {RootPath}";
             EmptyState.Visibility = Visibility.Visible;
         }
+
+        if (pinRepoPath is not null)
+            SelectAndRevealRepo(pinRepoPath);
+    }
+
+    /// <summary>
+    /// Selects and scrolls the top-level repo row with the given path into
+    /// view, once the TreeView has generated its containers.
+    /// </summary>
+    private void SelectAndRevealRepo(string repoPath)
+    {
+        var node = _repos.FirstOrDefault(r =>
+            string.Equals(r.Path, repoPath, StringComparison.OrdinalIgnoreCase));
+        if (node is null) return;
+
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (RepoTree.ItemContainerGenerator.ContainerFromItem(node) is TreeViewItem item)
+            {
+                item.IsSelected = true;
+                item.BringIntoView();
+            }
+        }, System.Windows.Threading.DispatcherPriority.Background);
     }
 
     // ---- Row actions ----
@@ -480,6 +514,38 @@ public partial class MainWindow : Window
     private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
 
     private async void OnRefreshClick(object sender, RoutedEventArgs e) => await RefreshAsync();
+
+    private async void OnCloneRepoClick(object sender, RoutedEventArgs e)
+    {
+        var dlg = new CloneDialog(RootPath) { Owner = this };
+        if (dlg.ShowDialog() != true)
+            return;
+
+        WorktreeResult result;
+        ShowBusy("Cloning repository...");
+        try
+        {
+            result = await WorktreeService.CloneAsync(RootPath, dlg.Url, dlg.FolderName);
+        }
+        finally
+        {
+            HideBusy();
+        }
+
+        if (!result.Success)
+        {
+            MessageBox.Show(
+                this,
+                $"Could not clone repository:\n\n{result.Error}",
+                "Clone repository",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        Activate();
+        await RefreshAsync(pinRepoPath: result.Path);
+    }
 
     private async void OnPickRootClick(object sender, RoutedEventArgs e)
     {
