@@ -23,24 +23,9 @@ internal static class WorktreeService
         if (string.IsNullOrWhiteSpace(defaultBranch))
             defaultBranch = StageConfig.DefaultBranchFallback;
 
-        string? parent = Path.GetDirectoryName(mainRepoPath);
-        if (string.IsNullOrEmpty(parent))
-            return new WorktreeResult(false, null, "Could not determine parent directory of repo.");
-
-        string repoName = Path.GetFileName(mainRepoPath);
-        string worktreeRoot = Path.Combine(parent, $"{repoName}.wt");
-
-        try
-        {
-            Directory.CreateDirectory(worktreeRoot);
-        }
-        catch (Exception ex)
-        {
-            return new WorktreeResult(false, null, $"Could not create worktree root folder: {ex.Message}");
-        }
-
-        int slot = NextSlot(worktreeRoot);
-        string targetPath = Path.Combine(worktreeRoot, slot.ToString());
+        WorktreeResult? prep = PrepareTargetPath(mainRepoPath, out string targetPath);
+        if (prep is not null)
+            return prep;
 
         // Fetch latest before creating the worktree.
         await RunGitAsync(mainRepoPath, ["fetch"], ct);
@@ -63,6 +48,95 @@ internal static class WorktreeService
 
         string err = string.IsNullOrWhiteSpace(stderr) ? stderr2 : stderr;
         return new WorktreeResult(false, null, err);
+    }
+
+    /// <summary>
+    /// Creates a new worktree in the next available numbered slot that lands on
+    /// an existing ref instead of a freshly-created branch. Backs the
+    /// "Existing branch" and "Default branch" options of the create dialog.
+    /// <para>
+    /// When <paramref name="branchName"/> is supplied the worktree checks out a
+    /// local branch of that name, creating it from <paramref name="targetRef"/>
+    /// if it doesn't exist yet. If the branch already exists and is checked out
+    /// in another worktree, git refuses the checkout, so we fall back to a
+    /// detached checkout of <paramref name="targetRef"/>. When
+    /// <paramref name="branchName"/> is <see langword="null"/> (the
+    /// "Default branch" flow) the worktree is created detached directly,
+    /// because the default branch is normally already checked out in the
+    /// primary worktree.
+    /// </para>
+    /// </summary>
+    public static async Task<WorktreeResult> CreateFromRefAsync(string mainRepoPath, string targetRef, string? branchName, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(targetRef))
+            return new WorktreeResult(false, null, "Target ref cannot be empty.");
+
+        WorktreeResult? prep = PrepareTargetPath(mainRepoPath, out string targetPath);
+        if (prep is not null)
+            return prep;
+
+        // Fetch so origin/* refs are current before we branch off them.
+        await RunGitAsync(mainRepoPath, ["fetch", "--prune"], ct);
+
+        if (!string.IsNullOrWhiteSpace(branchName))
+        {
+            // 1) Create a new local branch tracking the remote ref.
+            var (ok, stderr) = await RunGitAsync(mainRepoPath, ["worktree", "add", "-b", branchName, targetPath, targetRef], ct);
+            if (ok)
+                return new WorktreeResult(true, targetPath, null);
+
+            // 2) The local branch already exists — check it out as-is.
+            var (ok2, _) = await RunGitAsync(mainRepoPath, ["worktree", "add", targetPath, branchName], ct);
+            if (ok2)
+                return new WorktreeResult(true, targetPath, null);
+
+            // 3) Branch is checked out in another worktree (or some other
+            //    failure) — fall back to a detached checkout so the user still
+            //    lands on the branch's commit.
+            var (ok3, stderr3) = await RunGitAsync(mainRepoPath, ["worktree", "add", "--detach", targetPath, targetRef], ct);
+            if (ok3)
+                return new WorktreeResult(true, targetPath, null);
+
+            return new WorktreeResult(false, null, string.IsNullOrWhiteSpace(stderr3) ? stderr : stderr3);
+        }
+
+        // Default-branch flow: detached checkout (the branch is usually already
+        // checked out in the primary worktree).
+        var (okd, stderrd) = await RunGitAsync(mainRepoPath, ["worktree", "add", "--detach", targetPath, targetRef], ct);
+        return okd
+            ? new WorktreeResult(true, targetPath, null)
+            : new WorktreeResult(false, null, stderrd);
+    }
+
+    /// <summary>
+    /// Resolves the next worktree slot under <c>&lt;repoParent&gt;\&lt;RepoName&gt;.wt</c>,
+    /// ensuring the root folder exists. Returns a failed <see cref="WorktreeResult"/>
+    /// on error (and leaves <paramref name="targetPath"/> empty), or
+    /// <see langword="null"/> on success with the slot path in
+    /// <paramref name="targetPath"/>.
+    /// </summary>
+    private static WorktreeResult? PrepareTargetPath(string mainRepoPath, out string targetPath)
+    {
+        targetPath = "";
+        string? parent = Path.GetDirectoryName(mainRepoPath);
+        if (string.IsNullOrEmpty(parent))
+            return new WorktreeResult(false, null, "Could not determine parent directory of repo.");
+
+        string repoName = Path.GetFileName(mainRepoPath);
+        string worktreeRoot = Path.Combine(parent, $"{repoName}.wt");
+
+        try
+        {
+            Directory.CreateDirectory(worktreeRoot);
+        }
+        catch (Exception ex)
+        {
+            return new WorktreeResult(false, null, $"Could not create worktree root folder: {ex.Message}");
+        }
+
+        int slot = NextSlot(worktreeRoot);
+        targetPath = Path.Combine(worktreeRoot, slot.ToString());
+        return null;
     }
 
     /// <summary>
