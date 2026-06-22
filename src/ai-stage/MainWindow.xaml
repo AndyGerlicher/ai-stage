@@ -292,6 +292,9 @@
                     <Button Content="&#xE72C;" Click="OnRefreshClick"
                             Style="{StaticResource CaptionButtonStyle}" ToolTip="Refresh (Ctrl+R)"
                             FontSize="14"/>
+                    <Button Content="&#xE710;" Click="OnCloneRepoClick"
+                            Style="{StaticResource CaptionButtonStyle}" ToolTip="Clone a repository…"
+                            FontSize="14"/>
                     <Button Content="&#xE8DA;" Click="OnPickRootClick"
                             Style="{StaticResource CaptionButtonStyle}" ToolTip="Change root folder"
                             FontSize="14"/>

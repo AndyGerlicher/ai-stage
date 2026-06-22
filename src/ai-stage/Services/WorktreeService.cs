@@ -186,6 +186,51 @@ internal static class WorktreeService
         return new WorktreeResult(true, worktreePath, null);
     }
 
+    /// <summary>
+    /// Clones <paramref name="url"/> into <paramref name="rootPath"/> via
+    /// <c>git clone &lt;url&gt; [folderName]</c>. When <paramref name="folderName"/>
+    /// is blank git picks the destination folder from the URL. Returns the
+    /// cloned repo's path on success.
+    /// </summary>
+    public static async Task<WorktreeResult> CloneAsync(string rootPath, string url, string? folderName, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return new WorktreeResult(false, null, "Repository URL cannot be empty.");
+        if (string.IsNullOrWhiteSpace(rootPath) || !Directory.Exists(rootPath))
+            return new WorktreeResult(false, null, $"Root folder not found: {rootPath}");
+
+        url = url.Trim();
+        string folder = (folderName ?? "").Trim();
+
+        var args = new List<string> { "clone", url };
+        if (folder.Length > 0)
+            args.Add(folder);
+
+        var (ok, stderr) = await RunGitAsync(rootPath, args, ct);
+        if (!ok)
+            return new WorktreeResult(false, null, string.IsNullOrWhiteSpace(stderr) ? "git clone failed." : stderr);
+
+        string targetFolder = folder.Length > 0 ? folder : DeriveFolderNameFromUrl(url);
+        string clonedPath = Path.Combine(rootPath, targetFolder);
+        return new WorktreeResult(true, clonedPath, null);
+    }
+
+    /// <summary>
+    /// Mirrors git's default clone destination: the last path segment of the
+    /// URL with a trailing <c>.git</c> removed. Handles both URL
+    /// (<c>https://host/owner/repo.git</c>) and scp-like
+    /// (<c>git@host:owner/repo.git</c>) forms.
+    /// </summary>
+    private static string DeriveFolderNameFromUrl(string url)
+    {
+        string s = url.Trim().TrimEnd('/');
+        int sep = s.LastIndexOfAny(['/', ':']);
+        string last = sep >= 0 ? s[(sep + 1)..] : s;
+        if (last.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
+            last = last[..^4];
+        return last.Trim();
+    }
+
     /// <summary>Returns the next available integer slot in the worktree root.</summary>
     public static int NextSlot(string worktreeRoot)
     {
