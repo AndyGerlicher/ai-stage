@@ -61,6 +61,8 @@ public partial class MainWindow : Window
     public Dictionary<string, string> AgentLaunchCommands { get; set; } = new();
 
     private readonly ObservableCollection<RepoNode> _repos = new();
+    private readonly ObservableCollection<OpenFolderNode> _openFolders = new();
+    private readonly RecentFoldersService _recentFolders = new();
     private readonly RepoFilter _filter = new();
     private IAgentSessionStore? _agentStore;
     private AgentSessionRowBinder? _agentBinder;
@@ -87,6 +89,9 @@ public partial class MainWindow : Window
         ApplyUpdateStatus(UpdateService.CurrentStatus);
 
         RepoTree.ItemsSource = _repos;
+        OpenFoldersList.ItemsSource = _openFolders;
+        _openFolders.CollectionChanged += (_, _) => UpdateOpenFoldersVisibility();
+        UpdateOpenFoldersVisibility();
 
         var view = CollectionViewSource.GetDefaultView(_repos);
         view.Filter = o => o is RepoNode r && r.MatchesFilter();
@@ -95,7 +100,7 @@ public partial class MainWindow : Window
         await RefreshAsync();
 
         _agentStore = AgentRegistry.CreateAggregateStore();
-        _agentBinder = new AgentSessionRowBinder(_agentStore, _repos, Dispatcher);
+        _agentBinder = new AgentSessionRowBinder(_agentStore, _repos, _openFolders, Dispatcher);
         _agentStore.Start();
 
         Closed += (_, _) =>
@@ -500,6 +505,7 @@ public partial class MainWindow : Window
     {
         RepoNode r => r.Path,
         WorktreeNode w => w.Path,
+        OpenFolderNode f => f.Path,
         _ => null,
     };
 
@@ -514,6 +520,114 @@ public partial class MainWindow : Window
     private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
 
     private async void OnRefreshClick(object sender, RoutedEventArgs e) => await RefreshAsync();
+
+    /// <summary>
+    /// Opens a folder picker, records the chosen folder as a one-off recent, and
+    /// hands it to ai-frame via <see cref="OpenPath"/>.
+    /// </summary>
+    private void OnOpenFolderClick(object sender, RoutedEventArgs e)
+    {
+        var picker = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Select a folder to open in ai-frame",
+            Multiselect = false,
+            InitialDirectory = Directory.Exists(RootPath) ? RootPath : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        };
+        if (picker.ShowDialog() != true) return;
+
+        OpenOneOffFolder(picker.FolderName);
+    }
+
+    /// <summary>
+    /// Builds and shows the recent one-off folders menu next to the Open-folder
+    /// button. Entries that no longer exist on disk, or that are already present
+    /// in the scanned repo/worktree list, are filtered out.
+    /// </summary>
+    private void OnRecentFoldersClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button) return;
+
+        var menu = new ContextMenu
+        {
+            PlacementTarget = button,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+        };
+
+        var scanned = ScannedPathSet();
+        var recents = _recentFolders.GetRecent()
+            .Where(Directory.Exists)
+            .Where(f => !scanned.Contains(NormalizeForCompare(f)))
+            .Take(8)
+            .ToList();
+
+        if (recents.Count == 0)
+        {
+            menu.Items.Add(new MenuItem { Header = "No recent folders", IsEnabled = false });
+        }
+        else
+        {
+            foreach (string folder in recents)
+            {
+                var item = new MenuItem
+                {
+                    Header = Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar)) is { Length: > 0 } leaf ? leaf : folder,
+                    ToolTip = folder,
+                };
+                string captured = folder;
+                item.Click += (_, _) => OpenOneOffFolder(captured);
+                menu.Items.Add(item);
+            }
+        }
+
+        menu.Items.Add(new Separator());
+        var browse = new MenuItem { Header = "Browse for folder…" };
+        browse.Click += OnOpenFolderClick;
+        menu.Items.Add(browse);
+
+        menu.IsOpen = true;
+    }
+
+    private void OnOpenFolderRowClick(object sender, RoutedEventArgs e)
+    {
+        string? path = GetPathFromButton(sender);
+        if (path is not null)
+            OpenPath(path);
+    }
+
+    /// <summary>Records a folder as a one-off recent and opens it in ai-frame.</summary>
+    private void OpenOneOffFolder(string folder)
+    {
+        _recentFolders.Add(folder);
+        OpenPath(folder);
+    }
+
+    /// <summary>Normalized set of every scanned repo and worktree path.</summary>
+    private HashSet<string> ScannedPathSet()
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var repo in _repos)
+        {
+            set.Add(NormalizeForCompare(repo.Path));
+            foreach (var wt in repo.Worktrees)
+                set.Add(NormalizeForCompare(wt.Path));
+        }
+        return set;
+    }
+
+    private static string NormalizeForCompare(string path)
+    {
+        try
+        {
+            return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+        catch
+        {
+            return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+    }
+
+    private void UpdateOpenFoldersVisibility() =>
+        OpenFoldersSection.Visibility = _openFolders.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
     private async void OnCloneRepoClick(object sender, RoutedEventArgs e)
     {
