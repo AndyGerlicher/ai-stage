@@ -15,6 +15,7 @@ internal sealed class AgentSessionRowBinder : IDisposable
 {
     private readonly IAgentSessionStore _store;
     private readonly ObservableCollection<RepoNode> _repos;
+    private readonly ObservableCollection<OpenFolderNode> _openFolders;
     private readonly Dispatcher _dispatcher;
 
     private IReadOnlyList<AgentSession> _lastSnapshot = Array.Empty<AgentSession>();
@@ -22,10 +23,12 @@ internal sealed class AgentSessionRowBinder : IDisposable
     public AgentSessionRowBinder(
         IAgentSessionStore store,
         ObservableCollection<RepoNode> repos,
+        ObservableCollection<OpenFolderNode> openFolders,
         Dispatcher dispatcher)
     {
         _store = store;
         _repos = repos;
+        _openFolders = openFolders;
         _dispatcher = dispatcher;
 
         _store.SnapshotChanged += OnSnapshotChanged;
@@ -100,6 +103,60 @@ internal sealed class AgentSessionRowBinder : IDisposable
             ApplyToRepo(repo, byCwd);
             foreach (var wt in repo.Worktrees)
                 ApplyToWorktree(wt, byCwd);
+        }
+
+        ReconcileOpenFolders(byCwd);
+    }
+
+    /// <summary>
+    /// Surfaces live sessions whose cwd isn't claimed by any scanned repo or
+    /// worktree as <see cref="OpenFolderNode"/> rows. Existing rows are updated
+    /// in place; rows whose folder no longer has a live session are removed.
+    /// </summary>
+    private void ReconcileOpenFolders(
+        Dictionary<string, (AgentSessionStatus status, int count)> byCwd)
+    {
+        var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var repo in _repos)
+        {
+            claimed.Add(NormalizePath(repo.Path));
+            foreach (var wt in repo.Worktrees)
+                claimed.Add(NormalizePath(wt.Path));
+        }
+
+        var unclaimed = byCwd
+            .Where(kv => !claimed.Contains(kv.Key))
+            .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+
+        // Drop rows that are no longer live.
+        for (int i = _openFolders.Count - 1; i >= 0; i--)
+        {
+            if (!unclaimed.ContainsKey(NormalizePath(_openFolders[i].Path)))
+                _openFolders.RemoveAt(i);
+        }
+
+        // Add or update the live one-offs.
+        foreach (var (path, agg) in unclaimed)
+        {
+            var existing = _openFolders.FirstOrDefault(
+                f => string.Equals(NormalizePath(f.Path), path, StringComparison.OrdinalIgnoreCase));
+            if (existing is null)
+            {
+                _openFolders.Add(new OpenFolderNode
+                {
+                    Name = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) is { Length: > 0 } leaf
+                        ? leaf
+                        : path,
+                    Path = path,
+                    AgentState = agg.status,
+                    AgentSessionCount = agg.count,
+                });
+            }
+            else
+            {
+                existing.AgentState = agg.status;
+                existing.AgentSessionCount = agg.count;
+            }
         }
     }
 

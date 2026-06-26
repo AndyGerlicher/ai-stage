@@ -256,6 +256,46 @@
                 </Grid>
             </Border>
         </DataTemplate>
+
+        <!-- One-off open folder row template -->
+        <DataTemplate DataType="{x:Type models:OpenFolderNode}">
+            <Border BorderThickness="5,0,0,0" Padding="2,0,0,0"
+                    BorderBrush="{Binding AgentState, Converter={StaticResource AgentBrush}, ConverterParameter=accent}"
+                    Background="{Binding AgentState, Converter={StaticResource AgentBrush}}">
+                <Grid Height="30" MouseLeftButtonDown="OnRowMouseDown">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" MinWidth="160"/>
+                        <ColumnDefinition Width="*" MinWidth="120"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding AgentState, Converter={StaticResource AgentGlyph}}"
+                                   FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                   Foreground="{Binding AgentState, Converter={StaticResource AgentBrush}, ConverterParameter=accent}"
+                                   VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBlock Text="&#xE838;" Foreground="#888" FontFamily="Segoe MDL2 Assets"
+                                   FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding Name}" Foreground="#e8e8e8"
+                                   FontSize="13" FontFamily="Segoe UI Semibold"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                        <Border Background="#22000000" CornerRadius="2"
+                                Padding="4,0" Margin="6,0,0,0"
+                                Visibility="{Binding AgentSessionCount, Converter={StaticResource GtOneToVis}}">
+                            <TextBlock Foreground="#e8e8e8" FontSize="10" FontFamily="Segoe UI"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding AgentSessionCount, StringFormat=×{0}}"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="{Binding Path}" Foreground="#777"
+                               FontSize="11" FontFamily="Consolas"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,4,0">
+                        <Button Content="&#xE8A7;" Click="OnOpenFolderRowClick" Tag="{Binding}"
+                                Style="{StaticResource RowActionButtonStyle}" ToolTip="Open in ai-frame"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
     </Window.Resources>
 
     <Border BorderBrush="#5a5a5a" BorderThickness="1" CornerRadius="8">
@@ -292,6 +332,12 @@
                     <Button Content="&#xE72C;" Click="OnRefreshClick"
                             Style="{StaticResource CaptionButtonStyle}" ToolTip="Refresh (Ctrl+R)"
                             FontSize="14"/>
+                    <Button Content="&#xE838;" Click="OnOpenFolderClick"
+                            Style="{StaticResource CaptionButtonStyle}" ToolTip="Open a folder in ai-frame…"
+                            FontSize="14"/>
+                    <Button Content="&#xE70D;" Click="OnRecentFoldersClick"
+                            Style="{StaticResource CaptionButtonStyle}" ToolTip="Recent folders"
+                            FontSize="9"/>
                     <Button Content="&#xE710;" Click="OnCloneRepoClick"
                             Style="{StaticResource CaptionButtonStyle}" ToolTip="Clone a repository…"
                             FontSize="14"/>
@@ -364,11 +410,24 @@
 
         <!-- Body -->
         <Grid Grid.Row="2">
-            <TreeView x:Name="RepoTree"
-                      Background="Transparent" BorderThickness="0"
-                      Foreground="#e8e8e8"
-                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                      ItemContainerStyle="{StaticResource StageTreeViewItemStyle}"/>
+            <DockPanel>
+                <Border x:Name="OpenFoldersSection" DockPanel.Dock="Top"
+                        Background="#161616" BorderBrush="#2a2a2a" BorderThickness="0,0,0,1"
+                        Visibility="Collapsed">
+                    <StackPanel Margin="20,4,0,4">
+                        <TextBlock Text="OPEN FOLDERS" Foreground="#666"
+                                   FontSize="10" FontFamily="Segoe UI Semibold"
+                                   Margin="0,2,0,4"/>
+                        <ItemsControl x:Name="OpenFoldersList"/>
+                    </StackPanel>
+                </Border>
+
+                <TreeView x:Name="RepoTree"
+                          Background="Transparent" BorderThickness="0"
+                          Foreground="#e8e8e8"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          ItemContainerStyle="{StaticResource StageTreeViewItemStyle}"/>
+            </DockPanel>
 
             <!-- Empty / status overlay -->
             <StackPanel x:Name="EmptyState" Visibility="Collapsed"
